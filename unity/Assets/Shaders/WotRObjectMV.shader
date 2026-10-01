@@ -1,9 +1,9 @@
-// Per-object motion vectors and silhouettes of characters, for the WotR DLSS mod.
+// Per-object motion vectors and silhouettes of characters, for the WotR Upscaler mod.
 // Drawn with ScriptableRenderContext.DrawRenderers using this material as the override. Unity supplies the previous-frame skinned
 // position in TEXCOORD4 (the game enables skinnedMotionVectors on its character renderers) together with unity_MatrixPreviousM and
 // unity_MotionVectorsParams (PerObjectData.MotionVectors, and the camera must request DepthTextureMode.MotionVectors).
 // The camera matrices and the scene depth come from globals set by the mod.
-Shader "Hidden/WotRDLSS/ObjectMotionVectors"
+Shader "Hidden/WotRUpscaler/ObjectMotionVectors"
 {
     HLSLINCLUDE
     // Per-object data the engine fills in (same layout the scriptable pipelines use).

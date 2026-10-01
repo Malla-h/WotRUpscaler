@@ -1,4 +1,4 @@
-namespace WotRDLSS
+namespace WotRUpscaler
 {
     // The upscalers the menus offer. Today: NVIDIA DLSS, and plain scaling (the 3D scene rendered smaller and just stretched, for comparison).
     // A new upscaler (FSR, XeSS) is one more entry here, a section of its own options in the menus (see ModMenuBridge.Register and the

@@ -6,7 +6,7 @@ using System.Text;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-namespace WotRDLSS
+namespace WotRUpscaler
 {
     // GPU timestamps at fixed points of a frame (see the native DoMark). Only issued while the benchmark runs.
     //   0 start of the main camera   1 start of the DLSS stage   2 end of the DLSS stage (motion vectors + evaluate)
@@ -22,7 +22,7 @@ namespace WotRDLSS
         public static void Mark(ScriptableRenderContext ctx, int slot)
         {
             if (!On) return;
-            if (cb == null) cb = new CommandBuffer { name = "WotRDLSS timing mark" };
+            if (cb == null) cb = new CommandBuffer { name = "WotRUpscaler timing mark" };
             cb.Clear();
             Dlss.QueueMark(cb, slot);
             ctx.ExecuteCommandBuffer(cb);
@@ -120,7 +120,7 @@ namespace WotRDLSS
             var report = new StringBuilder();
             string head = SystemInfo.graphicsDeviceName + ", " + Screen.width + "x" + Screen.height + ", vSync " + QualitySettings.vSyncCount + ", target fps " + Application.targetFrameRate;
             Main.Log("BENCH start: " + head);
-            report.AppendLine("WotR DLSS benchmark: " + head + ", " + DateTime.Now.ToString("yyyy-MM-dd HH:mm"));
+            report.AppendLine("WotR Upscaler benchmark: " + head + ", " + DateTime.Now.ToString("yyyy-MM-dd HH:mm"));
             report.AppendLine("Stages (GPU ms per frame): pre = scene before the DLSS stage, dlss = motion vectors + evaluate, marker = full-res depth/normals/stencil rebuild,");
             report.AppendLine("depth/hold/mask = the full-res depth + stencil, the held depth + normals, and the character mask for the ground markers; post = rest of the main camera (full-res post-processing in the HDR path, decals, outlines), ui = UI camera, gpu = whole frame, eval = DLSS evaluate alone.");
             report.AppendLine("A mode without DLSS reports everything of the main camera under 'post'.");

@@ -1,11 +1,11 @@
-// Nearest-neighbour, jitter-compensated upscale of the scene depth, stencil and normals for the WotR DLSS mod.
+// Nearest-neighbour, jitter-compensated upscale of the scene depth, stencil and normals for the WotR Upscaler mod.
 // After the 3D scene has been upscaled to output resolution, the rest of the main camera's render chain (decals for the selection circle and
 // the click marker, depth of field, ...) expects buffers of the same size as the colour buffer, and works with the un-jittered camera.
 // Each output pixel reads the low-resolution pixel that holds what the un-jittered camera sees at that spot: the projection jitter moves
 // the image content by minus the jitter (render pixels), so the source position is (output position * scale) - jitter.
 // The game's decal shaders test the stencil bit "receive decals" that the geometry pass writes next to the depth, so the stencil is carried
 // over too, one bit per draw.
-Shader "Hidden/WotRDLSS/DepthUpscale"
+Shader "Hidden/WotRUpscaler/DepthUpscale"
 {
     Properties
     {

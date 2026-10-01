@@ -6,7 +6,7 @@ using UnityEngine;
 using UnityEngine.Rendering;
 using Owlcat.Runtime.Visual.RenderPipeline.Passes;
 
-namespace WotRDLSS
+namespace WotRUpscaler
 {
     // The decal pass (selection circle, click marker) calls ScriptableRenderContext.SetupCameraProperties, which gives it the jittered
     // camera. Once the camera works at output resolution, follow that call with the un-jittered matrices so the decals stay still.
@@ -21,7 +21,7 @@ namespace WotRDLSS
         {
             ctx.SetupCameraProperties(cam, stereo);
             if (!Scaler.PostDlss || !Jitter.Applied || !Scaler.IsScaled(cam)) return;
-            if (cb == null) cb = new CommandBuffer { name = "WotRDLSS un-jittered decals" };
+            if (cb == null) cb = new CommandBuffer { name = "WotRUpscaler un-jittered decals" };
             cb.Clear();
             cb.SetViewProjectionMatrices(cam.worldToCameraMatrix, Jitter.BaseProjection);
             ctx.ExecuteCommandBuffer(cb);

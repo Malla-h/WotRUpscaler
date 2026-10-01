@@ -2,7 +2,7 @@ using UnityEngine;
 using UnityEngine.Rendering;
 using Owlcat.Runtime.Visual.RenderPipeline;
 
-namespace WotRDLSS
+namespace WotRUpscaler
 {
     // Sub-pixel camera jitter for the scaled camera, and the view-projection matrices the depth-based motion vector pass needs.
     public static class Jitter

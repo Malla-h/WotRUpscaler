@@ -7,7 +7,7 @@ using UnityEngine.Experimental.Rendering;
 using Owlcat.Runtime.Visual.RenderPipeline;
 using Kingmaker.Visual.Decals;
 
-namespace WotRDLSS
+namespace WotRUpscaler
 {
     // Upscales the scaled main camera and hands a full-resolution image to the rest of the pipeline.
     //
@@ -25,7 +25,7 @@ namespace WotRDLSS
         static readonly int AfterPP = Shader.PropertyToID("_AfterPostProcessColorRT");
         static readonly int ColorRt = Shader.PropertyToID("_CameraColorRT");
         static readonly int DepthId = Shader.PropertyToID("_CameraDepthRT");
-        static CommandBuffer cb = new CommandBuffer { name = "WotRDLSS upscale" };
+        static CommandBuffer cb = new CommandBuffer { name = "WotRUpscaler upscale" };
 
         public static readonly string[] GBufferIds =
         {
@@ -82,14 +82,14 @@ namespace WotRDLSS
             if (depthCopy != null) depthCopy.Release();
             if (motion != null) motion.Release();
             var c = FullDesc(cd, rw, rh);
-            colorIn = Make(c, "WotRDLSS Color", FilterMode.Point);
+            colorIn = Make(c, "WotRUpscaler Color", FilterMode.Point);
             var d = c; d.depthBufferBits = 32; d.colorFormat = RenderTextureFormat.Depth;
             // A stencil format makes the stencil readable from shaders (RenderTextureSubElement.Stencil); without it the copy of the
             // stencil bits into the full-resolution buffer reads zeros, and the ground markers (stencil-tested decals) disappear.
             d.stencilFormat = GraphicsFormat.R8_UInt;
-            depthCopy = Make(d, "WotRDLSS Depth", FilterMode.Point);
+            depthCopy = Make(d, "WotRUpscaler Depth", FilterMode.Point);
             var m = c; m.colorFormat = RenderTextureFormat.RGHalf; m.sRGB = false; m.enableRandomWrite = true;
-            motion = Make(m, "WotRDLSS MV", FilterMode.Point);
+            motion = Make(m, "WotRUpscaler MV", FilterMode.Point);
             Main.Log("DLSS inputs " + rw + "x" + rh + " color " + colorIn.format + " depth " + depthCopy.format);
         }
 
@@ -99,7 +99,7 @@ namespace WotRDLSS
             if (Full != null) Full.Release();
             if (Holder != null) { Holder.Release(); Holder = null; }
             var d = FullDesc(cd, w, h); d.enableRandomWrite = true;
-            Full = Make(d, "WotRDLSS Full", FilterMode.Bilinear);
+            Full = Make(d, "WotRUpscaler Full", FilterMode.Bilinear);
             Main.Log("full-res target " + w + "x" + h + " " + Full.format + ", camera target " + cd.width + "x" + cd.height);
         }
 
@@ -250,11 +250,11 @@ namespace WotRDLSS
             // Last frame's values for the ground markers: the jittered low-resolution sources change a little every frame, and decals that read
             // them (selection circle, click marker) flickered. A pixel that was already still in the previous frame and is still now keeps its
             // exact value (see the DepthHold / NormalsHold shader passes). Only the screen areas where GUI decals can draw are processed.
-            bool fresh = EnsureFullRT(ref depthHist, w, h, RenderTextureFormat.RFloat, "WotRDLSS Depth history");
-            fresh |= EnsureFullRT(ref normalsFull, w, h, RenderTextureFormat.ARGB32, "WotRDLSS Normals");
-            fresh |= EnsureFullRT(ref normalsHist, w, h, RenderTextureFormat.ARGB32, "WotRDLSS Normals history");
-            fresh |= EnsureFullRT(ref stillFlag, w, h, RenderTextureFormat.R8, "WotRDLSS Still");
-            fresh |= EnsureFullRT(ref stillHist, w, h, RenderTextureFormat.R8, "WotRDLSS Still history");
+            bool fresh = EnsureFullRT(ref depthHist, w, h, RenderTextureFormat.RFloat, "WotRUpscaler Depth history");
+            fresh |= EnsureFullRT(ref normalsFull, w, h, RenderTextureFormat.ARGB32, "WotRUpscaler Normals");
+            fresh |= EnsureFullRT(ref normalsHist, w, h, RenderTextureFormat.ARGB32, "WotRUpscaler Normals history");
+            fresh |= EnsureFullRT(ref stillFlag, w, h, RenderTextureFormat.R8, "WotRUpscaler Still");
+            fresh |= EnsureFullRT(ref stillHist, w, h, RenderTextureFormat.R8, "WotRUpscaler Still history");
             if (fresh) histFrame = -1;
             bool temporal = guided && Jitter.Applied && motion != null && histFrame == Time.frameCount - 1 && !Jitter.ResetPending;
             var swap = stillFlag; stillFlag = stillHist; stillHist = swap;          // last frame's flags become the history
@@ -433,7 +433,7 @@ namespace WotRDLSS
             {
                 if (Holder != null) Holder.Release();
                 var d = Full.descriptor; d.enableRandomWrite = false;
-                Holder = Make(d, "WotRDLSS Holder", FilterMode.Bilinear);
+                Holder = Make(d, "WotRUpscaler Holder", FilterMode.Bilinear);
             }
             rel.CopyTexture(new RenderTargetIdentifier(ColorRt), Holder);
         }
@@ -483,7 +483,7 @@ namespace WotRDLSS
             __state = false;
             var cd = renderingData.CameraData;
             if (!Scaler.Active || cd.IsFirstInChain || !Scaler.IsUiCamera(cd.Camera) || Scaler.MainFrame != Time.frameCount || Upscale.Full == null) return;
-            var rel = new CommandBuffer { name = "WotRDLSS release gbuffer" };
+            var rel = new CommandBuffer { name = "WotRUpscaler release gbuffer" };
             Upscale.Stash(rel);
             foreach (var n in Upscale.GBufferIds) rel.ReleaseTemporaryRT(Shader.PropertyToID(n));
             context.ExecuteCommandBuffer(rel);

@@ -5,7 +5,7 @@ using System.Text;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-namespace WotRDLSS
+namespace WotRUpscaler
 {
     // Debug tool: records the DLSS inputs of a few consecutive frames (colour, final motion vectors, character motion target) plus the
     // DLSS output of the last one, as raw half-float files with a metadata file per frame, so the frames can be analysed offline

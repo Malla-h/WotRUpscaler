@@ -18,7 +18,7 @@ public static class BuildBundle
             string path = AssetDatabase.GUIDToAssetPath(guid);
             var importer = AssetImporter.GetAtPath(path);
             if (importer == null) continue;
-            importer.assetBundleName = "wotrdlss";
+            importer.assetBundleName = "wotrupscaler";
             importer.SaveAndReimport();
             count++;
             Debug.Log("bundle shader: " + path);

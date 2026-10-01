@@ -1,4 +1,4 @@
-"""Offline analysis of a WotRDLSS frame capture (debug button in the mod panel).
+"""Offline analysis of a WotRUpscaler frame capture (debug button in the mod panel).
 
 Loads the raw half-float dumps (colour input, final motion vectors, character motion target, DLSS output), reprojects each frame
 onto the next with the motion vectors under several hypotheses, and reports how well each hypothesis explains the image, separately

@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>net48</TargetFramework>
-    <AssemblyName>WotRDLSS</AssemblyName>
+    <AssemblyName>WotRUpscaler</AssemblyName>
     <LangVersion>latest</LangVersion>
     <WotRDir Condition="'$(WotRDir)'==''">H:\SteamLibrary\steamapps\common\Pathfinder Second Adventure</WotRDir>
     <Managed>$(WotRDir)\Wrath_Data\Managed</Managed>

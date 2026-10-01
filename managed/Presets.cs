@@ -1,4 +1,4 @@
-namespace WotRDLSS
+namespace WotRUpscaler
 {
     // The named choices offered in the menus. The stored settings stay plain numbers (a scale multiplier, an NGX preset number), so a
     // preset NVIDIA adds later keeps working: it can be typed in as a number, and showing it costs one new line in the table below.

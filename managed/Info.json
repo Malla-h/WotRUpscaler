@@ -1,10 +1,10 @@
 {
-  "Id": "WotRDLSS",
-  "DisplayName": "WotR DLSS",
+  "Id": "WotRUpscaler",
+  "DisplayName": "WotR Upscaler",
   "Author": "Malla-h",
   "Version": "0.1.0",
   "ManagerVersion": "0.21.3",
-  "AssemblyName": "WotRDLSS.dll",
-  "EntryMethod": "WotRDLSS.Main.Load",
+  "AssemblyName": "WotRUpscaler.dll",
+  "EntryMethod": "WotRUpscaler.Main.Load",
   "LoadAfter": [ "ModMenu" ]
 }

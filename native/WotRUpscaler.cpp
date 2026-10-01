@@ -1,4 +1,4 @@
-// WotRDLSS: minimal NGX DLSS (D3D11) bridge plus a depth-to-motion-vector compute pass, for Unity 2020.3 (Pathfinder: WotR). Loaded with LoadLibrary from the mod folder.
+// WotRUpscaler: minimal NGX DLSS (D3D11) bridge plus a depth-to-motion-vector compute pass, for Unity 2020.3 (Pathfinder: WotR). Loaded with LoadLibrary from the mod folder.
 // Everything that touches the D3D11 context runs from Unity plugin events on the render thread.
 #include <windows.h>
 #include <d3d11.h>
@@ -786,17 +786,17 @@ static void __stdcall OnEvent(int eventId, void* data)
 }
 
 // ---- exports ----
-EXPORT void WotRDLSS_SetLogPath(const wchar_t* path) { wcscpy_s(g_logPath, path); }
-EXPORT void* WotRDLSS_GetEventFunc() { return reinterpret_cast<void*>(&OnEvent); }
-EXPORT int WotRDLSS_GetStatus() { return g_status; }
-EXPORT unsigned WotRDLSS_GetLastResult() { return g_lastResult; }
-EXPORT int WotRDLSS_GetEvalCount() { return g_evalCount; }
+EXPORT void WotRUpscaler_SetLogPath(const wchar_t* path) { wcscpy_s(g_logPath, path); }
+EXPORT void* WotRUpscaler_GetEventFunc() { return reinterpret_cast<void*>(&OnEvent); }
+EXPORT int WotRUpscaler_GetStatus() { return g_status; }
+EXPORT unsigned WotRUpscaler_GetLastResult() { return g_lastResult; }
+EXPORT int WotRUpscaler_GetEvalCount() { return g_evalCount; }
 // GPU time of the DLSS evaluate call, accumulated from timestamp queries since the last reset.
-EXPORT void WotRDLSS_ResetEvalTiming() { g_evalUs = 0; g_evalTimed = 0; }
-EXPORT int WotRDLSS_GetEvalTiming(unsigned long long* totalUs, unsigned long long* count) { *totalUs = g_evalUs; *count = g_evalTimed; return g_tsReady ? 1 : 0; }
+EXPORT void WotRUpscaler_ResetEvalTiming() { g_evalUs = 0; g_evalTimed = 0; }
+EXPORT int WotRUpscaler_GetEvalTiming(unsigned long long* totalUs, unsigned long long* count) { *totalUs = g_evalUs; *count = g_evalTimed; return g_tsReady ? 1 : 0; }
 
 // Video memory used by this process on the GPU, and the budget the OS gives it, in MB. Returns 0 if unavailable (no device yet).
-EXPORT int WotRDLSS_GetVramMB(unsigned long long* usageMB, unsigned long long* budgetMB)
+EXPORT int WotRUpscaler_GetVramMB(unsigned long long* usageMB, unsigned long long* budgetMB)
 {
     *usageMB = 0; *budgetMB = 0;
     if (!g_device) return 0;
@@ -826,14 +826,14 @@ EXPORT int WotRDLSS_GetVramMB(unsigned long long* usageMB, unsigned long long* b
     return ok;
 }
 
-EXPORT void WotRDLSS_SetDebugStats(int on) { g_debugStats = on; }
-EXPORT void WotRDLSS_SetFrameTiming(int on) { g_frOn = on; }
-EXPORT void WotRDLSS_ResetFrameTiming() { for (int i = 0; i < 9; i++) { g_secUs[i] = 0; g_secN[i] = 0; } }
-EXPORT int WotRDLSS_GetFrameTiming(int slot, unsigned long long* us, unsigned long long* n)
+EXPORT void WotRUpscaler_SetDebugStats(int on) { g_debugStats = on; }
+EXPORT void WotRUpscaler_SetFrameTiming(int on) { g_frOn = on; }
+EXPORT void WotRUpscaler_ResetFrameTiming() { for (int i = 0; i < 9; i++) { g_secUs[i] = 0; g_secN[i] = 0; } }
+EXPORT int WotRUpscaler_GetFrameTiming(int slot, unsigned long long* us, unsigned long long* n)
 {
     if (slot < 0 || slot > 8) return 0;
     *us = g_secUs[slot]; *n = g_secN[slot];
     return g_device ? 1 : 0;
 }
-EXPORT int WotRDLSS_StructSizes(int which) { return which == 0 ? (int)sizeof(CreateData) : which == 1 ? (int)sizeof(EvalData) : which == 2 ? (int)sizeof(MvData) : (int)sizeof(CompData); }
+EXPORT int WotRUpscaler_StructSizes(int which) { return which == 0 ? (int)sizeof(CreateData) : which == 1 ? (int)sizeof(EvalData) : which == 2 ? (int)sizeof(MvData) : (int)sizeof(CompData); }
 

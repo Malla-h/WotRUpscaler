@@ -5,7 +5,7 @@ using UnityEngine.Rendering;
 using Owlcat.Runtime.Visual.RenderPipeline;
 using Owlcat.Runtime.Visual.RenderPipeline.RendererFeatures.Highlighting.Passes;
 
-namespace WotRDLSS
+namespace WotRUpscaler
 {
     // The game's outline pass (hover, selection) runs at the very end of the main camera's chain. Without help it would draw the outlines
     // at the low render resolution with the jittered projection and stretch them over the upscaled image: thick, blocky and shimmering.
@@ -24,7 +24,7 @@ namespace WotRDLSS
             d.width = cam.pixelWidth; d.height = cam.pixelHeight;
             renderingData.CameraData.CameraTargetDescriptor = d;
 
-            var cb = new CommandBuffer { name = "WotRDLSS outline projection" };
+            var cb = new CommandBuffer { name = "WotRUpscaler outline projection" };
             cb.SetViewProjectionMatrices(cam.worldToCameraMatrix, Jitter.BaseProjection);
             context.ExecuteCommandBuffer(cb);
             cb.Release();

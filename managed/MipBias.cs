@@ -2,7 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace WotRDLSS
+namespace WotRUpscaler
 {
     // Rendering below output resolution samples textures at coarser mips than a native render would. Upscalers expect the game to
     // compensate with a negative texture LOD bias of log2(render/output) - 1 (about -1.585 for 2/3 scale).

@@ -3,11 +3,11 @@ using UnityEngine;
 using UnityEngine.Rendering;
 using Owlcat.Runtime.Visual.RenderPipeline;
 
-namespace WotRDLSS
+namespace WotRUpscaler
 {
     // Per-object motion vectors for the characters. Unity already tracks previous-frame skinned positions for them (the game enables
     // skinnedMotionVectors on every character renderer), so drawing them with a motion vector shader gives exact per-vertex motion
-    // without any skinning work of our own. The shader lives in the wotrdlss asset bundle (built with the same Unity version as the game);
+    // without any skinning work of our own. The shader lives in the wotrupscaler asset bundle (built with the same Unity version as the game);
     // the result goes into a separate target that the native plugin merges into the camera motion vectors.
     public static class ObjectMv
     {
@@ -41,7 +41,7 @@ namespace WotRDLSS
             if (Target == null || Target.width != rw || Target.height != rh)
             {
                 if (Target != null) Target.Release();
-                Target = new RenderTexture(rw, rh, 0, RenderTextureFormat.ARGBHalf, RenderTextureReadWrite.Linear) { name = "WotRDLSS ObjMV", filterMode = FilterMode.Point };
+                Target = new RenderTexture(rw, rh, 0, RenderTextureFormat.ARGBHalf, RenderTextureReadWrite.Linear) { name = "WotRUpscaler ObjMV", filterMode = FilterMode.Point };
                 Target.Create();
             }
             cb.SetGlobalMatrix(JitteredVP, Jitter.VPJittered);
@@ -95,7 +95,7 @@ namespace WotRDLSS
             var offsets = px > 0f
                 ? new[] { Vector2.zero, new Vector2(-px, -px), new Vector2(px, -px), new Vector2(-px, px), new Vector2(px, px) }
                 : new[] { Vector2.zero };
-            var c = new CommandBuffer { name = "WotRDLSS character mask" };
+            var c = new CommandBuffer { name = "WotRUpscaler character mask" };
             foreach (var o in offsets)
             {
                 var p = proj;

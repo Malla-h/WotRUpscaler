@@ -4,25 +4,25 @@ using System.Runtime.InteropServices;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-namespace WotRDLSS
+namespace WotRUpscaler
 {
-    // Managed side of WotRDLSS.dll (native NGX bridge). All D3D11 work happens on the render thread via plugin events.
+    // Managed side of WotRUpscaler.dll (native NGX bridge). All D3D11 work happens on the render thread via plugin events.
     public static class Dlss
     {
         [DllImport("kernel32", CharSet = CharSet.Unicode, SetLastError = true)] static extern IntPtr LoadLibraryW(string path);
-        [DllImport("WotRDLSSNative", CharSet = CharSet.Unicode)] static extern void WotRDLSS_SetLogPath(string path);
-        [DllImport("WotRDLSSNative")] static extern IntPtr WotRDLSS_GetEventFunc();
-        [DllImport("WotRDLSSNative")] static extern int WotRDLSS_GetStatus();
-        [DllImport("WotRDLSSNative")] static extern uint WotRDLSS_GetLastResult();
-        [DllImport("WotRDLSSNative")] static extern int WotRDLSS_GetEvalCount();
-        [DllImport("WotRDLSSNative")] static extern int WotRDLSS_StructSizes(int which);
-        [DllImport("WotRDLSSNative")] static extern void WotRDLSS_SetDebugStats(int on);
-        [DllImport("WotRDLSSNative")] static extern void WotRDLSS_SetFrameTiming(int on);
-        [DllImport("WotRDLSSNative")] static extern void WotRDLSS_ResetFrameTiming();
-        [DllImport("WotRDLSSNative")] static extern int WotRDLSS_GetFrameTiming(int slot, out ulong us, out ulong n);
-        [DllImport("WotRDLSSNative")] static extern void WotRDLSS_ResetEvalTiming();
-        [DllImport("WotRDLSSNative")] static extern int WotRDLSS_GetEvalTiming(out ulong us, out ulong n);
-        [DllImport("WotRDLSSNative")] static extern int WotRDLSS_GetVramMB(out ulong usage, out ulong budget);
+        [DllImport("WotRUpscalerNative", CharSet = CharSet.Unicode)] static extern void WotRUpscaler_SetLogPath(string path);
+        [DllImport("WotRUpscalerNative")] static extern IntPtr WotRUpscaler_GetEventFunc();
+        [DllImport("WotRUpscalerNative")] static extern int WotRUpscaler_GetStatus();
+        [DllImport("WotRUpscalerNative")] static extern uint WotRUpscaler_GetLastResult();
+        [DllImport("WotRUpscalerNative")] static extern int WotRUpscaler_GetEvalCount();
+        [DllImport("WotRUpscalerNative")] static extern int WotRUpscaler_StructSizes(int which);
+        [DllImport("WotRUpscalerNative")] static extern void WotRUpscaler_SetDebugStats(int on);
+        [DllImport("WotRUpscalerNative")] static extern void WotRUpscaler_SetFrameTiming(int on);
+        [DllImport("WotRUpscalerNative")] static extern void WotRUpscaler_ResetFrameTiming();
+        [DllImport("WotRUpscalerNative")] static extern int WotRUpscaler_GetFrameTiming(int slot, out ulong us, out ulong n);
+        [DllImport("WotRUpscalerNative")] static extern void WotRUpscaler_ResetEvalTiming();
+        [DllImport("WotRUpscalerNative")] static extern int WotRUpscaler_GetEvalTiming(out ulong us, out ulong n);
+        [DllImport("WotRUpscalerNative")] static extern int WotRUpscaler_GetVramMB(out ulong usage, out ulong budget);
 
         [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
         struct CreateData
@@ -80,7 +80,7 @@ namespace WotRDLSS
 
         public static string Describe()
         {
-            return "DLSS " + state + (loaded ? " status=" + WotRDLSS_GetStatus() + " evals=" + WotRDLSS_GetEvalCount() : "") + (LastFailure.Length > 0 ? " [" + LastFailure + "]" : "");
+            return "DLSS " + state + (loaded ? " status=" + WotRUpscaler_GetStatus() + " evals=" + WotRUpscaler_GetEvalCount() : "") + (LastFailure.Length > 0 ? " [" + LastFailure + "]" : "");
         }
 
         public static void Retry() { if (state == St.Failed) { state = St.Off; LastFailure = ""; } }
@@ -89,28 +89,28 @@ namespace WotRDLSS
         {
             if (!File.Exists(Path.Combine(Main.Dir, "nvngx_dlss.dll")))
             {
-                LastFailure = "nvngx_dlss.dll is missing from the WotRDLSS mod folder";
+                LastFailure = "nvngx_dlss.dll is missing from the WotRUpscaler mod folder";
                 Main.Log(LastFailure);
                 return false;
             }
             try
             {
-                var path = Path.Combine(Main.Dir, "WotRDLSSNative.dll");
+                var path = Path.Combine(Main.Dir, "WotRUpscalerNative.dll");
                 if (LoadLibraryW(path) == IntPtr.Zero) { LastFailure = "LoadLibrary failed err=" + Marshal.GetLastWin32Error(); Main.Log(LastFailure + " " + path); return false; }
-                WotRDLSS_SetLogPath(Path.Combine(Main.Dir, "WotRDLSS.native.log"));
-                int sc = WotRDLSS_StructSizes(0), se = WotRDLSS_StructSizes(1), sm = WotRDLSS_StructSizes(2), sp = WotRDLSS_StructSizes(3);
+                WotRUpscaler_SetLogPath(Path.Combine(Main.Dir, "WotRUpscaler.native.log"));
+                int sc = WotRUpscaler_StructSizes(0), se = WotRUpscaler_StructSizes(1), sm = WotRUpscaler_StructSizes(2), sp = WotRUpscaler_StructSizes(3);
                 if (sc != CreateSize || se != EvalSize || sm != MvSize || sp != CompSize)
                 {
                     LastFailure = "struct size mismatch native " + sc + "/" + se + "/" + sm + " managed " + CreateSize + "/" + EvalSize + "/" + MvSize;
                     Main.Log(LastFailure);
                     return false;
                 }
-                eventFn = WotRDLSS_GetEventFunc();
+                eventFn = WotRUpscaler_GetEventFunc();
                 evalRing = Marshal.AllocHGlobal(se * 16);
                 createRing = Marshal.AllocHGlobal(sc * 4);
                 mvRing = Marshal.AllocHGlobal(sm * 16);
                 compRing = Marshal.AllocHGlobal(sp * 16);
-                cb = new CommandBuffer { name = "WotRDLSS" };
+                cb = new CommandBuffer { name = "WotRUpscaler" };
                 loaded = true;
                 Main.Log("native plugin loaded");
                 return true;
@@ -133,16 +133,16 @@ namespace WotRDLSS
 
         // Benchmark: GPU timestamps (see GpuTimer / the native DoMark) and the totals they produce.
         public static void QueueMark(CommandBuffer c, int slot) { if (loaded) Issue(c, 9, (IntPtr)slot); }
-        public static void SetFrameTiming(bool on) { if (loaded) try { WotRDLSS_SetFrameTiming(on ? 1 : 0); } catch { } }
-        public static void ResetFrameTiming() { if (loaded) try { WotRDLSS_ResetFrameTiming(); } catch { } }
-        public static void ResetEvalTiming() { if (loaded) try { WotRDLSS_ResetEvalTiming(); } catch { } }
+        public static void SetFrameTiming(bool on) { if (loaded) try { WotRUpscaler_SetFrameTiming(on ? 1 : 0); } catch { } }
+        public static void ResetFrameTiming() { if (loaded) try { WotRUpscaler_ResetFrameTiming(); } catch { } }
+        public static void ResetEvalTiming() { if (loaded) try { WotRUpscaler_ResetEvalTiming(); } catch { } }
 
         // Average GPU milliseconds of the section that ends at mark 'slot' (8 = first to last mark of the frame) since the last reset.
         public static bool FrameTimingMs(int slot, out double ms, out ulong samples)
         {
             ms = 0; samples = 0;
             if (!loaded) return false;
-            try { ulong us; if (WotRDLSS_GetFrameTiming(slot, out us, out samples) != 1 || samples == 0) return false; ms = us / (double)samples / 1000.0; return true; }
+            try { ulong us; if (WotRUpscaler_GetFrameTiming(slot, out us, out samples) != 1 || samples == 0) return false; ms = us / (double)samples / 1000.0; return true; }
             catch { return false; }
         }
 
@@ -151,7 +151,7 @@ namespace WotRDLSS
         {
             ms = 0; samples = 0;
             if (!loaded) return false;
-            try { ulong us; if (WotRDLSS_GetEvalTiming(out us, out samples) != 1 || samples == 0) return false; ms = us / (double)samples / 1000.0; return true; }
+            try { ulong us; if (WotRUpscaler_GetEvalTiming(out us, out samples) != 1 || samples == 0) return false; ms = us / (double)samples / 1000.0; return true; }
             catch { return false; }
         }
 
@@ -159,7 +159,7 @@ namespace WotRDLSS
         {
             use = budget = 0;
             if (!loaded) return false;
-            try { return WotRDLSS_GetVramMB(out use, out budget) == 1; } catch { return false; }
+            try { return WotRUpscaler_GetVramMB(out use, out budget) == 1; } catch { return false; }
         }
 
         public static int QualityFor(float scale)
@@ -176,18 +176,18 @@ namespace WotRDLSS
         {
             if (state == St.Failed) return false;
             if (!loaded && !Load()) { state = St.Failed; return false; }
-            if (Main.S.debugStats != statsOn) { statsOn = Main.S.debugStats; try { WotRDLSS_SetDebugStats(statsOn ? 1 : 0); } catch { } }
+            if (Main.S.debugStats != statsOn) { statsOn = Main.S.debugStats; try { WotRUpscaler_SetDebugStats(statsOn ? 1 : 0); } catch { } }
             int q = QualityFor((float)rw / outW), preset = Main.S.preset, hdr = Main.S.dlssBeforePost ? 1 : 0;
 
             if (state == St.Creating)
             {
                 if (Time.frameCount - createFrame < 3) return false;
-                int s = WotRDLSS_GetStatus();
+                int s = WotRUpscaler_GetStatus();
                 if (s == 1) { state = St.Ready; Main.Log("DLSS ready"); }
                 else if (s < 0)
                 {
                     state = St.Failed;
-                    LastFailure = "status " + s + " result 0x" + WotRDLSS_GetLastResult().ToString("X8");
+                    LastFailure = "status " + s + " result 0x" + WotRUpscaler_GetLastResult().ToString("X8");
                     Main.Log("DLSS failed: " + LastFailure);
                 }
                 return false;
@@ -205,7 +205,7 @@ namespace WotRDLSS
             };
             var p = createRing + (slot++ & 3) * CreateSize;
             Marshal.StructureToPtr(cd, p, false);
-            var c = new CommandBuffer { name = "WotRDLSS create" };
+            var c = new CommandBuffer { name = "WotRUpscaler create" };
             Issue(c, 1, p);
             Graphics.ExecuteCommandBuffer(c);
             c.Release();

@@ -3,7 +3,7 @@ using UnityEngine;
 using UnityEngine.Rendering;
 using Owlcat.Runtime.Visual.RenderPipeline;
 
-namespace WotRDLSS
+namespace WotRUpscaler
 {
     // Decides which cameras render at reduced resolution and keeps the pipeline asset's RenderScale in step with the setting.
     public static class Scaler

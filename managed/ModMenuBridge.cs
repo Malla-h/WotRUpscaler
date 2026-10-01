@@ -10,7 +10,7 @@ using ModMenu.Settings;
 using UnityEngine;
 using UnityModManagerNet;
 
-namespace WotRDLSS
+namespace WotRUpscaler
 {
     // Mirrors the player-facing options into the in-game "Mods" settings page that the ModMenu mod provides. ModMenu is optional: without
     // it nothing here runs and the Mods panel (Ctrl+F10) stays the only place. The settings file stays the source of truth: the menu is
@@ -66,15 +66,15 @@ namespace WotRDLSS
         static void Register()
         {
             var info = Main.Mod.Info;
-            var b = SettingsBuilder.New("wotrdlss", Str("wotrdlss.title", "Upscaling"))
+            var b = SettingsBuilder.New("wotrupscaler", Str("wotrupscaler.title", "Upscaling"))
                 .SetMod(Main.Mod, false, false)
-                .SetModName(Str("wotrdlss.name", "WotR DLSS"))
-                .SetModDescription(Str("wotrdlss.description", "Renders the 3D scene at a lower resolution and upscales it with NVIDIA DLSS. The interface stays at full resolution."))
+                .SetModName(Str("wotrupscaler.name", "WotR Upscaler"))
+                .SetModDescription(Str("wotrupscaler.description", "Renders the 3D scene at a lower resolution and upscales it with NVIDIA DLSS. The interface stays at full resolution."))
                 .SetModVersion(info.Version)
                 .SetModAuthor(info.Author);
 
-            b.AddToggle(Toggle.New("wotrdlss.enabled", true, Str("wotrdlss.enabled", "Scale 3D rendering"))
-                .WithLongDescription(Str("wotrdlss.enabled.long", "Renders the 3D scene at a lower resolution and upscales it. Off: the game renders as usual."))
+            b.AddToggle(Toggle.New("wotrupscaler.enabled", true, Str("wotrupscaler.enabled", "Scale 3D rendering"))
+                .WithLongDescription(Str("wotrupscaler.enabled.long", "Renders the 3D scene at a lower resolution and upscales it. Off: the game renders as usual."))
                 .OnValueChanged(v => Changed("enabled", v)));
 
             // One entry per upscaler (see Upscalers). Options that belong to a single upscaler sit in a section of their own below.
@@ -82,48 +82,48 @@ namespace WotRDLSS
             var upTip = new StringBuilder("How the lower-resolution 3D scene is turned back into a sharp image.");
             for (int i = 0; i < Upscalers.All.Length; i++)
             {
-                ups.Add(Str("wotrdlss.upscaler." + i, Upscalers.All[i].Name));
+                ups.Add(Str("wotrupscaler.upscaler." + i, Upscalers.All[i].Name));
                 upTip.Append("\n").Append(Upscalers.All[i].Name).Append(": ").Append(Upscalers.All[i].Info);
             }
-            b.AddDropdownList(DropdownList.New("wotrdlss.upscaler", 0, Str("wotrdlss.upscaler", "Upscaler"), ups)
-                .WithLongDescription(Str("wotrdlss.upscaler.long", upTip.ToString()))
+            b.AddDropdownList(DropdownList.New("wotrupscaler.upscaler", 0, Str("wotrupscaler.upscaler", "Upscaler"), ups)
+                .WithLongDescription(Str("wotrupscaler.upscaler.long", upTip.ToString()))
                 .OnValueChanged(v => Changed("upscaler", v)));
 
             var modes = new List<LocalizedString>();
-            for (int i = 0; i < Presets.Modes.Length; i++) modes.Add(Str("wotrdlss.mode." + i, Presets.Modes[i].Label));
-            modes.Add(Str("wotrdlss.mode.custom", "Custom (use the slider)"));
-            b.AddDropdownList(DropdownList.New("wotrdlss.mode", Presets.ModeIndex(0.6667f), Str("wotrdlss.mode", "Quality mode"), modes)
-                .WithLongDescription(Str("wotrdlss.mode.long", "How far below the screen resolution the 3D scene is rendered. Lower is faster, higher is sharper. Native (DLAA) renders at full resolution and uses the upscaler only for anti-aliasing."))
+            for (int i = 0; i < Presets.Modes.Length; i++) modes.Add(Str("wotrupscaler.mode." + i, Presets.Modes[i].Label));
+            modes.Add(Str("wotrupscaler.mode.custom", "Custom (use the slider)"));
+            b.AddDropdownList(DropdownList.New("wotrupscaler.mode", Presets.ModeIndex(0.6667f), Str("wotrupscaler.mode", "Quality mode"), modes)
+                .WithLongDescription(Str("wotrupscaler.mode.long", "How far below the screen resolution the 3D scene is rendered. Lower is faster, higher is sharper. Native (DLAA) renders at full resolution and uses the upscaler only for anti-aliasing."))
                 .OnValueChanged(v => Changed("mode", v)));
 
-            b.AddSliderFloat(SliderFloat.New("wotrdlss.scale", 0.6667f, Str("wotrdlss.scale", "Render scale"), 0.33f, 1f)
+            b.AddSliderFloat(SliderFloat.New("wotrupscaler.scale", 0.6667f, Str("wotrupscaler.scale", "Render scale"), 0.33f, 1f)
                 .WithStep(0.01f).WithDecimalPlaces(2)
-                .WithLongDescription(Str("wotrdlss.scale.long", "The multiplier of the screen resolution that the 3D scene is rendered at. Picking a quality mode sets it; moving the slider selects Custom."))
+                .WithLongDescription(Str("wotrupscaler.scale.long", "The multiplier of the screen resolution that the 3D scene is rendered at. Picking a quality mode sets it; moving the slider selects Custom."))
                 .OnValueChanged(v => Changed("scale", v)));
 
-            b.AddSubHeader(Str("wotrdlss.dlss.header", "NVIDIA DLSS"), true);
+            b.AddSubHeader(Str("wotrupscaler.dlss.header", "NVIDIA DLSS"), true);
             var presets = new List<LocalizedString>();
             var tip = new StringBuilder("Which DLSS model runs.");
             for (int i = 0; i < Presets.DlssPresets.Length; i++)
             {
-                presets.Add(Str("wotrdlss.preset." + i, Presets.DlssPresets[i].Name));
+                presets.Add(Str("wotrupscaler.preset." + i, Presets.DlssPresets[i].Name));
                 tip.Append("\n").Append(Presets.DlssPresets[i].Info);
             }
-            presets.Add(Str("wotrdlss.preset.other", "Other (number set in the Mods panel)"));
+            presets.Add(Str("wotrupscaler.preset.other", "Other (number set in the Mods panel)"));
             tip.Append("\nOther: a preset number outside this list, typed into the Mods panel (Ctrl+F10), for presets NVIDIA adds later.");
-            b.AddDropdownList(DropdownList.New("wotrdlss.preset", Presets.DlssIndex(Presets.Recommended), Str("wotrdlss.preset", "DLSS preset"), presets)
-                .WithLongDescription(Str("wotrdlss.preset.long", tip.ToString()))
+            b.AddDropdownList(DropdownList.New("wotrupscaler.preset", Presets.DlssIndex(Presets.Recommended), Str("wotrupscaler.preset", "DLSS preset"), presets)
+                .WithLongDescription(Str("wotrupscaler.preset.long", tip.ToString()))
                 .OnValueChanged(v => Changed("preset", v)));
-            b.AddToggle(Toggle.New("wotrdlss.hdr", true, Str("wotrdlss.hdr", "Run DLSS before post-processing (HDR input)"))
-                .WithLongDescription(Str("wotrdlss.hdr.long", "Gives DLSS the unprocessed scene, so bloom, depth of field and colour grading work at full resolution. Costs a little performance. Off: DLSS runs on the finished image."))
+            b.AddToggle(Toggle.New("wotrupscaler.hdr", true, Str("wotrupscaler.hdr", "Run DLSS before post-processing (HDR input)"))
+                .WithLongDescription(Str("wotrupscaler.hdr.long", "Gives DLSS the unprocessed scene, so bloom, depth of field and colour grading work at full resolution. Costs a little performance. Off: DLSS runs on the finished image."))
                 .OnValueChanged(v => Changed("hdr", v)));
 
-            b.AddSubHeader(Str("wotrdlss.advanced", "More options"), false);
-            b.AddToggle(Toggle.New("wotrdlss.smaa", true, Str("wotrdlss.smaa", "Switch off the game's SMAA and FXAA while an AI upscaler is on"))
-                .WithLongDescription(Str("wotrdlss.smaa.long", "The upscaler does its own anti-aliasing; the game's SMAA or FXAA would only soften the image it receives."))
+            b.AddSubHeader(Str("wotrupscaler.advanced", "More options"), false);
+            b.AddToggle(Toggle.New("wotrupscaler.smaa", true, Str("wotrupscaler.smaa", "Switch off the game's SMAA and FXAA while an AI upscaler is on"))
+                .WithLongDescription(Str("wotrupscaler.smaa.long", "The upscaler does its own anti-aliasing; the game's SMAA or FXAA would only soften the image it receives."))
                 .OnValueChanged(v => Changed("smaa", v)));
-            b.AddToggle(Toggle.New("wotrdlss.mip", true, Str("wotrdlss.mip", "Automatic texture sharpening"))
-                .WithLongDescription(Str("wotrdlss.mip.long", "Lowers the texture mip bias to match the render scale, as upscalers expect, so textures stay sharp."))
+            b.AddToggle(Toggle.New("wotrupscaler.mip", true, Str("wotrupscaler.mip", "Automatic mip map bias"))
+                .WithLongDescription(Str("wotrupscaler.mip.long", "Adjusts the texture mip map bias to the render scale, as upscalers expect, so textures stay sharp at lower render resolutions."))
                 .OnValueChanged(v => Changed("mip", v)));
             b.AddDefaultButton();
             global::ModMenu.ModMenu.AddSettings(b);
@@ -198,21 +198,21 @@ namespace WotRDLSS
         {
             object o;
             if (shown.TryGetValue(key, out o) && (bool)o == v) return;
-            if (global::ModMenu.ModMenu.SetSetting("wotrdlss." + key, v)) shown[key] = v;
+            if (global::ModMenu.ModMenu.SetSetting("wotrupscaler." + key, v)) shown[key] = v;
         }
 
         static void PushInt(string key, int v)
         {
             object o;
             if (shown.TryGetValue(key, out o) && (int)o == v) return;
-            if (global::ModMenu.ModMenu.SetSetting("wotrdlss." + key, v)) shown[key] = v;
+            if (global::ModMenu.ModMenu.SetSetting("wotrupscaler." + key, v)) shown[key] = v;
         }
 
         static void PushFloat(string key, float v)
         {
             object o;
             if (shown.TryGetValue(key, out o) && Mathf.Abs((float)o - v) < 0.0005f) return;
-            if (global::ModMenu.ModMenu.SetSetting("wotrdlss." + key, v)) shown[key] = v;
+            if (global::ModMenu.ModMenu.SetSetting("wotrupscaler." + key, v)) shown[key] = v;
         }
     }
 
@@ -232,7 +232,7 @@ namespace WotRDLSS
     }
 }
 #else
-namespace WotRDLSS
+namespace WotRUpscaler
 {
     // Built without the ModMenu mod installed: no in-game menu entries.
     public static class ModMenuBridge

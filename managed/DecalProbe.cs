@@ -9,7 +9,7 @@ using Owlcat.Runtime.Visual.RenderPipeline;
 using Owlcat.Runtime.Visual.RenderPipeline.Passes;
 using Kingmaker.Visual.Decals;
 
-namespace WotRDLSS
+namespace WotRUpscaler
 {
     // Debug probe for the ground markers (selection circle, click marker). Records the colour buffer around the game's "GUI decals" pass for a
     // couple of frames and counts the pixels the pass changed, together with the state of the decals in the scene.
@@ -118,7 +118,7 @@ namespace WotRDLSS
             var cam = rd.CameraData.Camera;
             int w = cam.pixelWidth, h = cam.pixelHeight;
             Ensure(w, h);
-            var cb = new CommandBuffer { name = "WotRDLSS decal probe" };
+            var cb = new CommandBuffer { name = "WotRUpscaler decal probe" };
             if (!isBefore) Dlss.QueuePassEnd(cb, Scaler.PostDlss && Upscale.LowResDepth != null ? Upscale.LowResDepth.GetNativeTexturePtr() : System.IntPtr.Zero);           // close the GPU statistics of the decal pass before our own blit
             cb.Blit(Color(pass), isBefore ? before : after);
             if (isBefore)
@@ -162,7 +162,7 @@ namespace WotRDLSS
             }
             if (isBefore && Dlss.EnsureLoaded())
             {
-                Main.Log("decal probe: GPU statistics and state of the decal pass go to WotRDLSS.native.log (" + cam.name + ", PostDlss " + Scaler.PostDlss + ", Active " + Scaler.Active + ")");
+                Main.Log("decal probe: GPU statistics and state of the decal pass go to WotRUpscaler.native.log (" + cam.name + ", PostDlss " + Scaler.PostDlss + ", Active " + Scaler.Active + ")");
                 Dlss.QueuePassBegin(cb, before.GetNativeTexturePtr());   // everything the decal pass draws from here on is counted
             }
             ctx.ExecuteCommandBuffer(cb);

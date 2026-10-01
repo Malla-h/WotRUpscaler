@@ -7,7 +7,7 @@ using HarmonyLib;
 using UnityEngine;
 using Owlcat.Runtime.Visual.RenderPipeline;
 
-namespace WotRDLSS
+namespace WotRUpscaler
 {
     // The pipeline treats Camera.pixelRect/pixelWidth/pixelHeight as the size of its render targets. With a scaled camera the targets are
     // smaller than the camera, so every such read inside the pipeline assembly is redirected to the size the targets really have.

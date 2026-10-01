@@ -1,7 +1,7 @@
 using System.IO;
 using UnityEngine;
 
-namespace WotRDLSS
+namespace WotRUpscaler
 {
     // The shader asset bundle (built with the game's own Unity version, see the unity folder of the source).
     public static class Bundle
@@ -15,8 +15,8 @@ namespace WotRDLSS
             if (!tried)
             {
                 tried = true;
-                string path = Path.Combine(Main.Dir, "wotrdlss");
-                if (!File.Exists(path)) { Error = "wotrdlss bundle missing"; Main.Log("shader bundle missing: " + path); }
+                string path = Path.Combine(Main.Dir, "wotrupscaler");
+                if (!File.Exists(path)) { Error = "wotrupscaler bundle missing"; Main.Log("shader bundle missing: " + path); }
                 else
                 {
                     bundle = AssetBundle.LoadFromFile(path);

@@ -6,7 +6,7 @@ using HarmonyLib;
 using UnityEngine;
 using UnityModManagerNet;
 
-namespace WotRDLSS
+namespace WotRUpscaler
 {
     public class Settings : UnityModManager.ModSettings
     {
@@ -22,7 +22,7 @@ namespace WotRDLSS
         public bool mipAuto = true;           // follow the recommended bias for the current render scale
         public float mipStrength = 1f;        // fraction of the recommended texture LOD bias (log2(scale) - 1)
         public bool disableGameAA = true;     // switch the game's SMAA and FXAA off while DLSS is active
-        public bool characterMotion = true;   // per-object motion vectors for characters (needs the wotrdlss shader bundle)
+        public bool characterMotion = true;   // per-object motion vectors for characters (needs the wotrupscaler shader bundle)
         public float objSignX = 1f, objSignY = 1f;
         public float markerEdgeGapPx = 0.5f;            // the ground markers stop this many output pixels short of characters (covers their anti-aliased edge)
         public float holdTolerance = 0.004f;           // a still ground pixel keeps its depth/normals while the new depth is within this fraction of it
@@ -45,8 +45,8 @@ namespace WotRDLSS
         public static bool Load(UnityModManager.ModEntry entry)
         {
             Mod = entry; Dir = entry.Path;
-            logPath = Path.Combine(Dir, "WotRDLSS.log");
-            try { File.WriteAllText(logPath, "WotRDLSS " + DateTime.Now + "\n"); } catch { }
+            logPath = Path.Combine(Dir, "WotRUpscaler.log");
+            try { File.WriteAllText(logPath, "WotRUpscaler " + DateTime.Now + "\n"); } catch { }
             S = UnityModManager.ModSettings.Load<Settings>(entry);
             if (!S.debug)
             {   // developer-only switches never stay active from an old settings file
@@ -59,8 +59,8 @@ namespace WotRDLSS
             entry.OnSaveGUI = e => S.Save(e);
             entry.OnUpdate = (e, dt) => { Scaler.Update(); ModMenuBridge.Tick(); };
             entry.OnToggle = (e, on) => { S.enabled = on; Scaler.Update(); return true; };
-            harmony = new Harmony("wotr.dlss");
-            try { harmony.PatchAll(Assembly.GetExecutingAssembly()); PixelSize.Apply(harmony); Jitter.Install(); var go = new GameObject("WotRDLSS"); UnityEngine.Object.DontDestroyOnLoad(go); go.AddComponent<MipBias>(); go.AddComponent<Bench>(); Log("patched"); }
+            harmony = new Harmony("wotr.upscaler");
+            try { harmony.PatchAll(Assembly.GetExecutingAssembly()); PixelSize.Apply(harmony); Jitter.Install(); var go = new GameObject("WotRUpscaler"); UnityEngine.Object.DontDestroyOnLoad(go); go.AddComponent<MipBias>(); go.AddComponent<Bench>(); Log("patched"); }
             catch (Exception ex) { Log("patch failed: " + ex); return false; }
             return true;
         }
