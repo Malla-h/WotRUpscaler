@@ -13,7 +13,8 @@ namespace WotRDLSS
         public bool enabled = true;
         public float renderScale = 0.6667f;   // multiplier of the output resolution
         public bool dlss = true;              // false: plain upscale (test mode)
-        public int preset = 11;               // NGX render preset: 10=J 11=K 12=L 13=M, 0=default
+        public int preset = 11;
+        public int customPreset = 0;          // a preset number outside the named list, kept for the in-game menu's "Other" choice               // NGX render preset: 10=J 11=K 12=L 13=M, 0=default
         public bool dlssBeforePost = true;    // run DLSS on the HDR scene colour before post-processing (false: on the finished image)
         public bool noJitter = false;
         public float jitSx = -1f, jitSy = -1f;   // jitter sign towards DLSS (verified: displacement of the image = minus the projection jitter)
@@ -55,7 +56,7 @@ namespace WotRDLSS
             }
             entry.OnGUI = OnGUI;
             entry.OnSaveGUI = e => S.Save(e);
-            entry.OnUpdate = (e, dt) => Scaler.Update();
+            entry.OnUpdate = (e, dt) => { Scaler.Update(); ModMenuBridge.Tick(); };
             entry.OnToggle = (e, on) => { S.enabled = on; Scaler.Update(); return true; };
             harmony = new Harmony("wotr.dlss");
             try { harmony.PatchAll(Assembly.GetExecutingAssembly()); PixelSize.Apply(harmony); Jitter.Install(); var go = new GameObject("WotRDLSS"); UnityEngine.Object.DontDestroyOnLoad(go); go.AddComponent<MipBias>(); go.AddComponent<Bench>(); Log("patched"); }
@@ -69,16 +70,7 @@ namespace WotRDLSS
             try { File.AppendAllText(logPath, s + "\n"); } catch { }
         }
 
-        // DLSS quality modes and their render-scale ratios (Ultra Quality is the non-standard 0.77 step).
-        static readonly KeyValuePair<string, float>[] Presets =
-        {
-            new KeyValuePair<string, float>("Native", 1f),
-            new KeyValuePair<string, float>("Ultra Quality", 0.77f),
-            new KeyValuePair<string, float>("Quality", 0.6667f),
-            new KeyValuePair<string, float>("Balanced", 0.58f),
-            new KeyValuePair<string, float>("Performance", 0.5f),
-            new KeyValuePair<string, float>("Ultra Performance", 0.3333f),
-        };
+        static string customPresetText;
 
         static void OnGUI(UnityModManager.ModEntry e)
         {
@@ -88,15 +80,24 @@ namespace WotRDLSS
             GUILayout.Label("Render scale: " + S.renderScale.ToString("F2") + "x    Internal resolution: " + rw + " x " + rh + "    Output: " + ow + " x " + oh);
             S.renderScale = GUILayout.HorizontalSlider(S.renderScale, 0.33f, 1f);
             GUILayout.BeginHorizontal();
-            foreach (var p in Presets)
+            foreach (var p in Presets.Modes)
             {
-                bool on = Mathf.Abs(S.renderScale - p.Value) < 0.005f;
-                if (GUILayout.Toggle(on, p.Key + " (" + p.Value.ToString("0.##") + "x)", GUI.skin.button) && !on) S.renderScale = p.Value;
+                bool on = Mathf.Abs(S.renderScale - p.Scale) < 0.005f;
+                if (GUILayout.Toggle(on, p.Name + " (" + p.Scale.ToString("0.##") + "x)", GUI.skin.button) && !on) S.renderScale = p.Scale;
             }
             GUILayout.EndHorizontal();
 
             S.dlss = GUILayout.Toggle(S.dlss, "Use DLSS (off = plain upscale)");
             GUILayout.Label(Dlss.Describe());
+            GUILayout.Label("DLSS preset");
+            GUILayout.BeginHorizontal();
+            foreach (var p in Presets.DlssPresets)
+            {
+                bool on = S.preset == p.Value;
+                if (GUILayout.Toggle(on, p.Name, GUI.skin.button) && !on) S.preset = p.Value;
+            }
+            GUILayout.EndHorizontal();
+            GUILayout.Label(Presets.DlssInfo(S.preset));
             S.showAdvanced = GUILayout.Toggle(S.showAdvanced, "Advanced options");
             if (S.showAdvanced)
             {
@@ -107,8 +108,15 @@ namespace WotRDLSS
                 if (!S.mipAuto) S.mipStrength = GUILayout.HorizontalSlider(S.mipStrength, 0f, 1.5f);
                 S.dlssBeforePost = GUILayout.Toggle(S.dlssBeforePost, "Run DLSS before post-processing, HDR input (better quality, costs some performance). Off: on the finished image");
                 GUILayout.BeginHorizontal();
-                GUILayout.Label("DLSS preset (0 default, 10 J, 11 K, 12 L, 13 M): ");
-                int.TryParse(GUILayout.TextField(S.preset.ToString(), GUILayout.Width(40)), out S.preset);
+                GUILayout.Label("Other DLSS preset number (for presets newer than the list above): ", GUILayout.Width(480));
+                if (customPresetText == null) customPresetText = S.preset.ToString();
+                customPresetText = GUILayout.TextField(customPresetText, GUILayout.Width(50));
+                int typed;
+                if (GUILayout.Button("Use", GUILayout.Width(60)) && int.TryParse(customPresetText, out typed) && typed >= 0)
+                {
+                    S.preset = typed;
+                    if (Presets.DlssIndex(typed) < 0) S.customPreset = typed;
+                }
                 GUILayout.EndHorizontal();
                 GUILayout.BeginHorizontal();
                 GUILayout.Label("Ground marker gap at characters: " + S.markerEdgeGapPx.ToString("F1") + " px", GUILayout.Width(300));

@@ -5,5 +5,6 @@
   "Version": "0.1.0",
   "ManagerVersion": "0.21.3",
   "AssemblyName": "WotRDLSS.dll",
-  "EntryMethod": "WotRDLSS.Main.Load"
+  "EntryMethod": "WotRDLSS.Main.Load",
+  "LoadAfter": [ "ModMenu" ]
 }

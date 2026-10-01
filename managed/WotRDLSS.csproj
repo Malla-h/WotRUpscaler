@@ -18,4 +18,11 @@
     <Reference Include="$(Managed)\0Harmony.dll"><Private>false</Private></Reference>
     <Reference Include="$(Managed)\Assembly-CSharp.dll"><Private>false</Private></Reference>
   </ItemGroup>
+  <!-- Optional: the in-game Mods menu page of the ModMenu mod. Built in when ModMenu is installed next to the game; the mod runs without it. -->
+  <PropertyGroup Condition="Exists('$(WotRDir)\Mods\ModMenu\ModMenu.dll')">
+    <DefineConstants>$(DefineConstants);MODMENU</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup Condition="Exists('$(WotRDir)\Mods\ModMenu\ModMenu.dll')">
+    <Reference Include="$(WotRDir)\Mods\ModMenu\ModMenu.dll"><Private>false</Private></Reference>
+  </ItemGroup>
 </Project>
