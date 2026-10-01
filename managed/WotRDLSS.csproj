@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <AssemblyName>WotRDLSS</AssemblyName>
+    <LangVersion>latest</LangVersion>
+    <WotRDir Condition="'$(WotRDir)'==''">H:\SteamLibrary\steamapps\common\Pathfinder Second Adventure</WotRDir>
+    <Managed>$(WotRDir)\Wrath_Data\Managed</Managed>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="$(Managed)\UnityEngine*.dll"><Private>false</Private></Reference>
+    <Reference Include="$(Managed)\Unity.RenderPipelines.Core.Runtime.dll"><Private>false</Private></Reference>
+    <Reference Include="$(Managed)\Owlcat.Runtime.Visual.dll"><Private>false</Private></Reference>
+    <Reference Include="$(Managed)\Owlcat.Runtime.Core.dll"><Private>false</Private></Reference>
+    <Reference Include="$(Managed)\UnityModManager\UnityModManager.dll"><Private>false</Private></Reference>
+    <Reference Include="$(Managed)\0Harmony.dll"><Private>false</Private></Reference>
+    <Reference Include="$(Managed)\Assembly-CSharp.dll"><Private>false</Private></Reference>
+  </ItemGroup>
+</Project>

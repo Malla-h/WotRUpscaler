@@ -1,0 +1,35 @@
+# Build output
+managed/bin/
+managed/obj/
+managed/out/
+native/bin/
+*.dll
+*.pdb
+*.lib
+*.exp
+*.obj
+
+# NVIDIA runtime / SDK: never in the source repository (the release zip ships nvngx_dlss.dll with NVIDIA's license text)
+nvngx_dlss.dll
+ThirdParty/
+DLSS/
+
+# Unity project: generated folders and the built shader bundle (rebuilt with BuildBundle, shipped in the release zip)
+unity/Library/
+unity/Logs/
+unity/Temp/
+unity/UserSettings/
+unity/obj/
+unity/bundle/
+unity/*.csproj
+unity/*.sln
+
+# Debug dumps and local files
+capture_*/
+decalprobe_*/
+*.raw
+*.log
+Settings.xml
+__pycache__/
+*.pyc
+.vs/
