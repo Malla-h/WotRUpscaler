@@ -27,6 +27,18 @@ Shader "Hidden/WotRDLSS/DepthUpscale"
         return o;
     }
 
+    // The same for a pixel rectangle (x0, y0, x1, y1 in output pixels, rows counted as the rasteriser does): the passes that only matter
+    // around the ground markers draw just that area.
+    float4 _WotRRect;
+    v2f vertRect(uint id : SV_VertexID)
+    {
+        static const float2 corner[6] = { float2(0, 0), float2(1, 0), float2(0, 1), float2(0, 1), float2(1, 0), float2(1, 1) };
+        float2 p = lerp(_WotRRect.xy, _WotRRect.zw, corner[id]);
+        v2f o;
+        o.pos = float4(p.x / _WotRDstSize.x * 2.0 - 1.0, 1.0 - p.y / _WotRDstSize.y * 2.0, 0.0, 1.0);
+        return o;
+    }
+
     int2 SourcePixel(float2 pos)
     {
         float2 s = pos * (_WotRSrcSize.xy / _WotRDstSize.xy) - _WotRJitter.xy;
@@ -174,7 +186,7 @@ Shader "Hidden/WotRDLSS/DepthUpscale"
 
             HLSLPROGRAM
             #pragma target 4.5
-            #pragma vertex vert
+            #pragma vertex vertRect
             #pragma fragment frag
             Texture2D<uint2> _WotRStencil;
             float _Ref;
@@ -225,7 +237,7 @@ Shader "Hidden/WotRDLSS/DepthUpscale"
 
             HLSLPROGRAM
             #pragma target 4.5
-            #pragma vertex vert
+            #pragma vertex vertRect
             #pragma fragment frag
             Texture2D<float4> _WotRSrcColor;     // low-resolution normals of this frame
             Texture2D<float4> _WotRNormalsHist;  // output of the previous frame
@@ -254,7 +266,7 @@ Shader "Hidden/WotRDLSS/DepthUpscale"
 
             HLSLPROGRAM
             #pragma target 4.5
-            #pragma vertex vert
+            #pragma vertex vertRect
             #pragma fragment frag
             float4 frag(v2f i) : SV_Target
             {
@@ -279,9 +291,30 @@ Shader "Hidden/WotRDLSS/DepthUpscale"
 
             HLSLPROGRAM
             #pragma target 4.5
-            #pragma vertex vert
+            #pragma vertex vertRect
             #pragma fragment frag
             float4 frag(v2f i) : SV_Target { return (_WotRTemporal.x >= 0.5 && StillNeighbourhood(i.pos.xy)) ? 1.0 : 0.0; }
+            ENDHLSL
+        }
+        // Pass 7: the full-resolution depth in one pass: written to the depth buffer and to the sampled copy (single-channel colour target).
+        Pass
+        {
+            Name "DepthBoth"
+            ZWrite On
+
+            HLSLPROGRAM
+            #pragma target 4.5
+            #pragma vertex vert
+            #pragma fragment frag
+            struct PSOut { float4 c : SV_Target; float d : SV_Depth; };
+            PSOut frag(v2f i)
+            {
+                PSOut o;
+                float d = SampleDepth(i.pos.xy);
+                o.c = float4(d, 0, 0, 0);
+                o.d = d;
+                return o;
+            }
             ENDHLSL
         }
     }

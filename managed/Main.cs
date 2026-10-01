@@ -25,7 +25,7 @@ namespace WotRDLSS
         public float objSignX = 1f, objSignY = 1f;
         public float markerEdgeGapPx = 0.5f;            // the ground markers stop this many output pixels short of characters (covers their anti-aliased edge)
         public float holdTolerance = 0.004f;           // a still ground pixel keeps its depth/normals while the new depth is within this fraction of it
-        public bool debugFreezeMarkerDepth = false, debugFreezeMarkerNormals = false;   // debug: keep last frame's full-res depth copy / normals
+        public bool debugFullMarkerBuffers = false;   // debug: rebuild the marker buffers over the whole screen instead of around the decals
         public bool debugCharMv = false;      // log the raw per-object parameters instead of using the motion
         public bool debugStats = false;       // log character motion statistics (reads back from the GPU: small hitch every few seconds)
         public bool showAdvanced = false;
@@ -50,7 +50,7 @@ namespace WotRDLSS
             if (!S.debug)
             {   // developer-only switches never stay active from an old settings file
                 S.noJitter = false; S.jitSx = -1f; S.jitSy = -1f; S.mvSignX = 1f; S.mvSignY = 1f; S.objSignX = 1f; S.objSignY = 1f;
-                S.debugFreezeMarkerDepth = S.debugFreezeMarkerNormals = S.debugCharMv = S.debugStats = false;
+                S.debugFullMarkerBuffers = S.debugCharMv = S.debugStats = false;
                 S.holdTolerance = 0.004f;
             }
             entry.OnGUI = OnGUI;
@@ -134,10 +134,7 @@ namespace WotRDLSS
                     if (GUILayout.Button("Character census", GUILayout.Width(200))) { try { MipBias.Census(); } catch (System.Exception ex) { Log("census failed " + ex); } }
                     GUILayout.Label(Capture.Status);
                     GUILayout.EndHorizontal();
-                    GUILayout.BeginHorizontal();
-                    S.debugFreezeMarkerDepth = GUILayout.Toggle(S.debugFreezeMarkerDepth, "Freeze marker depth", GUILayout.Width(260));
-                    S.debugFreezeMarkerNormals = GUILayout.Toggle(S.debugFreezeMarkerNormals, "Freeze marker normals", GUILayout.Width(260));
-                    GUILayout.EndHorizontal();
+                    S.debugFullMarkerBuffers = GUILayout.Toggle(S.debugFullMarkerBuffers, "Marker buffers over the whole screen (slower; for comparison)");
                     GUILayout.BeginHorizontal();
                     GUILayout.Label("Marker hold tolerance: " + (S.holdTolerance * 100f).ToString("F2") + " % of depth", GUILayout.Width(300));
                     S.holdTolerance = Mathf.Round(GUILayout.HorizontalSlider(S.holdTolerance, 0.0005f, 0.02f, GUILayout.Width(200)) * 10000f) / 10000f;

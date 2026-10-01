@@ -1,9 +1,11 @@
+using System.Collections.Generic;
 using System.Reflection;
 using HarmonyLib;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Experimental.Rendering;
 using Owlcat.Runtime.Visual.RenderPipeline;
+using Kingmaker.Visual.Decals;
 
 namespace WotRDLSS
 {
@@ -41,11 +43,11 @@ namespace WotRDLSS
         static readonly int GuidedId = Shader.PropertyToID("_WotRGuided"), GuideLowId = Shader.PropertyToID("_WotRGuideLow"), GuideFullId = Shader.PropertyToID("_WotRGuideFull");
         static readonly int NormalsId = Shader.PropertyToID("_CameraNormalsRT"), SrcColor = Shader.PropertyToID("_WotRSrcColor"), JitterId = Shader.PropertyToID("_WotRJitter");
         static readonly int InvViewProjId = Shader.PropertyToID("_InvCameraViewProj"), InvProjId = Shader.PropertyToID("_InvProjMatrix");
-        static RenderTexture normalsFull, depthCopyFull, normalsHist, depthHist, stillFlag, stillHist;
+        static RenderTexture normalsFull, normalsHist, depthHist, stillFlag, stillHist;
         static int histFrame = -1;
         static readonly int NormalsHistId = Shader.PropertyToID("_WotRNormalsHist"), MotionId = Shader.PropertyToID("_WotRMotion"),
             DepthFullId = Shader.PropertyToID("_WotRDepthFull"), DepthHistId = Shader.PropertyToID("_WotRDepthHist"), TemporalId = Shader.PropertyToID("_WotRTemporal"),
-            StillHistId = Shader.PropertyToID("_WotRStillHist");
+            StillHistId = Shader.PropertyToID("_WotRStillHist"), RectId = Shader.PropertyToID("_WotRRect");
 
         // Creates or resizes a persistent full-resolution texture; returns true when it was (re)created.
         static bool EnsureFullRT(ref RenderTexture rt, int w, int h, RenderTextureFormat f, string name)
@@ -135,6 +137,77 @@ namespace WotRDLSS
             return true;
         }
 
+        // Screen areas (output pixels, rows as the rasteriser counts them: from the top) where the game's GUI decals (selection circle, click
+        // marker) can draw this frame. Only there do the stencil, normals and held values have to be rebuilt at full resolution.
+        struct Box { public int x0, y0, x1, y1; }
+        static readonly List<Box> boxes = new List<Box>();
+
+        static void MarkerAreas(Camera cam, int w, int h)
+        {
+            boxes.Clear();
+            var full = new Box { x0 = 0, y0 = 0, x1 = w, y1 = h };
+            if (Main.S.debugFullMarkerBuffers) { boxes.Add(full); return; }
+            var vp = Jitter.Applied ? Jitter.VPCurrent : GL.GetGPUProjectionMatrix(cam.projectionMatrix, true) * cam.worldToCameraMatrix;
+            const int margin = 24;
+            foreach (var d in ScreenSpaceDecal.All)
+            {
+                if (d.Type != ScreenSpaceDecal.DecalType.GUI || !d.isActiveAndEnabled || !d.IsVisible) continue;
+                var m = d.transform.localToWorldMatrix;
+                float x0 = float.MaxValue, y0 = float.MaxValue, x1 = float.MinValue, y1 = float.MinValue;
+                for (int i = 0; i < 8; i++)
+                {
+                    var wp = m.MultiplyPoint3x4(new Vector3((i & 1) - 0.5f, ((i >> 1) & 1) - 0.5f, ((i >> 2) & 1) - 0.5f));
+                    var clip = vp * new Vector4(wp.x, wp.y, wp.z, 1f);
+                    if (clip.w <= 1e-3f) { boxes.Clear(); boxes.Add(full); return; }       // a corner at or behind the camera: be safe
+                    float x = (clip.x / clip.w * 0.5f + 0.5f) * w, y = (0.5f - clip.y / clip.w * 0.5f) * h;
+                    if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y;
+                }
+                var b = new Box
+                {
+                    x0 = Mathf.Max(0, Mathf.FloorToInt(x0) - margin), y0 = Mathf.Max(0, Mathf.FloorToInt(y0) - margin),
+                    x1 = Mathf.Min(w, Mathf.CeilToInt(x1) + margin), y1 = Mathf.Min(h, Mathf.CeilToInt(y1) + margin)
+                };
+                if (b.x1 > b.x0 && b.y1 > b.y0) boxes.Add(b);
+            }
+            // Merge overlapping areas; many scattered ones become one.
+            bool merged = true;
+            while (merged)
+            {
+                merged = false;
+                for (int i = 0; i < boxes.Count && !merged; i++)
+                    for (int j = i + 1; j < boxes.Count && !merged; j++)
+                    {
+                        var a = boxes[i]; var c = boxes[j];
+                        if (a.x0 < c.x1 && c.x0 < a.x1 && a.y0 < c.y1 && c.y0 < a.y1)
+                        {
+                            boxes[i] = new Box { x0 = Mathf.Min(a.x0, c.x0), y0 = Mathf.Min(a.y0, c.y0), x1 = Mathf.Max(a.x1, c.x1), y1 = Mathf.Max(a.y1, c.y1) };
+                            boxes.RemoveAt(j);
+                            merged = true;
+                        }
+                    }
+            }
+            if (boxes.Count > 5)
+            {
+                var u = boxes[0];
+                foreach (var b in boxes) u = new Box { x0 = Mathf.Min(u.x0, b.x0), y0 = Mathf.Min(u.y0, b.y0), x1 = Mathf.Max(u.x1, b.x1), y1 = Mathf.Max(u.y1, b.y1) };
+                boxes.Clear(); boxes.Add(u);
+            }
+        }
+
+        static void DrawBoxes(CommandBuffer c, int pass)
+        {
+            foreach (var b in boxes)
+            {
+                c.SetGlobalVector(RectId, new Vector4(b.x0, b.y0, b.x1, b.y1));
+                c.DrawProcedural(Matrix4x4.identity, depthUpMat, pass, MeshTopology.Triangles, 6);
+            }
+        }
+
+        static void CopyBoxes(CommandBuffer c, RenderTargetIdentifier src, RenderTargetIdentifier dst)
+        {
+            foreach (var b in boxes) c.CopyTexture(src, 0, 0, b.x0, b.y0, b.x1 - b.x0, b.y1 - b.y0, dst, 0, 0, b.x0, b.y0);
+        }
+
         // The rest of the camera's chain (decals for the selection circle and click marker, depth of field, ...) expects depth buffers of the
         // same size as the colour buffer. Replace both depth targets by nearest-neighbour upscales of the low-resolution scene depth.
         // Needs depthCopy to hold this frame's depth.
@@ -155,13 +228,11 @@ namespace WotRDLSS
                 if (sh != null)
                 {
                     depthUpMat = new Material(sh) { hideFlags = HideFlags.HideAndDontSave };
-                    // One material per stencil bit: the stencil reference is render state, so it cannot change per draw.
-                    stencilMats = new Material[8];
-                    for (int k = 0; k < 8; k++)
-                    {
-                        stencilMats[k] = new Material(sh) { hideFlags = HideFlags.HideAndDontSave };
-                        stencilMats[k].SetFloat("_Ref", 1 << k);
-                    }
+                    // The stencil reference is render state, so it cannot change per draw: one material per bit. Only the bit the decal
+                    // shaders test after DLSS ("receive decals", 1) is rebuilt.
+                    stencilMats = new Material[1];
+                    stencilMats[0] = new Material(sh) { hideFlags = HideFlags.HideAndDontSave };
+                    stencilMats[0].SetFloat("_Ref", 1);
                 }
             }
             if (depthUpMat == null) { if (!depthUpLogged) { depthUpLogged = true; Main.Log("depth upscale shader missing: " + Bundle.Error); } return; }
@@ -176,38 +247,52 @@ namespace WotRDLSS
             var j = Jitter.FrameJitter;
             c.SetGlobalVector(JitterId, new Vector4(j.x, j.y, 0f, 0f));
 
-            c.ReleaseTemporaryRT(DepthId);
-            c.GetTemporaryRT(DepthId, depthDesc, FilterMode.Point);
-            c.SetRenderTarget(new RenderTargetIdentifier(DepthId));
-            c.ClearRenderTarget(true, false, Color.clear, 0f);           // a fresh temporary target holds garbage, stencil included
-            c.DrawProcedural(Matrix4x4.identity, depthUpMat, 0, MeshTopology.Triangles, 3);
-            // The geometry pass tags pixels in the stencil (for example "receive decals"); the decal shaders test those bits.
-            c.SetGlobalTexture(SrcStencil, new RenderTargetIdentifier(depthCopy), RenderTextureSubElement.Stencil);
-            for (int k = 0; k < 8; k++) c.DrawProcedural(Matrix4x4.identity, stencilMats[k], 2, MeshTopology.Triangles, 3);
-
-            // Persistent full-resolution textures for the depth copy and the normals, with last frame's versions: the jittered low-resolution
-            // sources change a little every frame, and decals that read them (selection circle, click marker) flickered. Still pixels keep
-            // last frame's exact values (see the DepthHold / NormalsHold shader passes); the textures can also be frozen for debugging.
-            bool fresh = EnsureFullRT(ref depthCopyFull, w, h, RenderTextureFormat.RFloat, "WotRDLSS DepthCopy");
-            fresh |= EnsureFullRT(ref depthHist, w, h, RenderTextureFormat.RFloat, "WotRDLSS Depth history");
+            // Last frame's values for the ground markers: the jittered low-resolution sources change a little every frame, and decals that read
+            // them (selection circle, click marker) flickered. A pixel that was already still in the previous frame and is still now keeps its
+            // exact value (see the DepthHold / NormalsHold shader passes). Only the screen areas where GUI decals can draw are processed.
+            bool fresh = EnsureFullRT(ref depthHist, w, h, RenderTextureFormat.RFloat, "WotRDLSS Depth history");
             fresh |= EnsureFullRT(ref normalsFull, w, h, RenderTextureFormat.ARGB32, "WotRDLSS Normals");
             fresh |= EnsureFullRT(ref normalsHist, w, h, RenderTextureFormat.ARGB32, "WotRDLSS Normals history");
             fresh |= EnsureFullRT(ref stillFlag, w, h, RenderTextureFormat.R8, "WotRDLSS Still");
             fresh |= EnsureFullRT(ref stillHist, w, h, RenderTextureFormat.R8, "WotRDLSS Still history");
             if (fresh) histFrame = -1;
             bool temporal = guided && Jitter.Applied && motion != null && histFrame == Time.frameCount - 1 && !Jitter.ResetPending;
+            var swap = stillFlag; stillFlag = stillHist; stillHist = swap;          // last frame's flags become the history
             if (motion != null) c.SetGlobalTexture(MotionId, motion);
             c.SetGlobalTexture(DepthHistId, depthHist);
             c.SetGlobalTexture(StillHistId, stillHist);
             c.SetGlobalVector(TemporalId, new Vector4(temporal ? 1f : 0f, Main.S.holdTolerance, 0f, 0f));
-            if (!Main.S.debugFreezeMarkerDepth)
-            {
-                c.SetRenderTarget(depthCopyFull);
-                c.DrawProcedural(Matrix4x4.identity, depthUpMat, 5, MeshTopology.Triangles, 3);
-            }
+            MarkerAreas(cam, w, h);
+
+            // Full-resolution depth, the whole screen: the depth buffer and the sampled copy (_CameraDepthCopyRT) in one pass.
+            c.ReleaseTemporaryRT(DepthId);
+            c.GetTemporaryRT(DepthId, depthDesc, FilterMode.Point);
             c.ReleaseTemporaryRT(DepthCopyId);
             c.GetTemporaryRT(DepthCopyId, copyDesc, FilterMode.Point);
-            c.CopyTexture(depthCopyFull, new RenderTargetIdentifier(DepthCopyId));
+            c.SetRenderTarget(new RenderTargetIdentifier(DepthCopyId), new RenderTargetIdentifier(DepthId));
+            c.ClearRenderTarget(true, false, Color.clear, 0f);           // a fresh temporary target holds garbage, stencil included
+            c.DrawProcedural(Matrix4x4.identity, depthUpMat, 7, MeshTopology.Triangles, 3);
+
+            // The geometry pass tags pixels in the stencil ("receive decals"); the decal shaders test that bit.
+            if (boxes.Count > 0)
+            {
+                c.SetRenderTarget(new RenderTargetIdentifier(DepthId));
+                c.SetGlobalTexture(SrcStencil, new RenderTargetIdentifier(depthCopy), RenderTextureSubElement.Stencil);
+                foreach (var b in boxes)
+                {
+                    c.SetGlobalVector(RectId, new Vector4(b.x0, b.y0, b.x1, b.y1));
+                    c.DrawProcedural(Matrix4x4.identity, stencilMats[0], 2, MeshTopology.Triangles, 6);
+                }
+            }
+            GpuTimer.Mark(c, 3);
+
+            // Held depth for the sampled copy, and the history for the next frame.
+            if (boxes.Count > 0)
+            {
+                c.SetRenderTarget(new RenderTargetIdentifier(DepthCopyId));
+                DrawBoxes(c, 5);
+                CopyBoxes(c, new RenderTargetIdentifier(DepthCopyId), depthHist);
+            }
 
             // Restore what the pipeline's depth copy pass leaves behind: shaders that read "the depth" get the copy, while the real depth
             // buffer stays bound as the depth target. (GetTemporaryRT above rebound _CameraDepthRT to the depth buffer itself; a draw that
@@ -218,24 +303,29 @@ namespace WotRDLSS
 
             // G-buffer normals: the decal shaders read them by pixel position (outside the low-resolution size they read nothing, which
             // limited the ground markers to one quarter of the screen).
-            if (!Main.S.debugFreezeMarkerNormals)
+            c.SetGlobalTexture(SrcColor, new RenderTargetIdentifier(NormalsId));        // the low-resolution ones, still allocated here
+            c.SetGlobalTexture(NormalsHistId, normalsHist);
+            c.SetGlobalTexture(DepthFullId, new RenderTargetIdentifier(DepthCopyId));
+            if (boxes.Count > 0)
             {
-                c.SetGlobalTexture(SrcColor, new RenderTargetIdentifier(NormalsId));
-                c.SetGlobalTexture(NormalsHistId, normalsHist);
-                c.SetGlobalTexture(DepthFullId, depthCopyFull);
                 c.SetRenderTarget(normalsFull);
-                c.DrawProcedural(Matrix4x4.identity, depthUpMat, 4, MeshTopology.Triangles, 3);
-                c.CopyTexture(normalsFull, normalsHist);
+                DrawBoxes(c, 4);
             }
+            // Which pixels are still, for the next frame (cleared everywhere else).
             c.SetRenderTarget(stillFlag);
-            c.DrawProcedural(Matrix4x4.identity, depthUpMat, 6, MeshTopology.Triangles, 3);
-            c.CopyTexture(stillFlag, stillHist);
-            if (!Main.S.debugFreezeMarkerDepth) c.CopyTexture(depthCopyFull, depthHist);
+            c.ClearRenderTarget(false, true, Color.clear);
+            if (boxes.Count > 0) DrawBoxes(c, 6);
             histFrame = guided && Jitter.Applied ? Time.frameCount : -1;
+
             var normalsDesc = FullDesc(cd, w, h); normalsDesc.colorFormat = RenderTextureFormat.ARGB32; normalsDesc.sRGB = false;
             c.ReleaseTemporaryRT(NormalsId);
             c.GetTemporaryRT(NormalsId, normalsDesc, FilterMode.Bilinear);
-            c.CopyTexture(normalsFull, new RenderTargetIdentifier(NormalsId));
+            if (boxes.Count > 0)
+            {
+                CopyBoxes(c, normalsFull, new RenderTargetIdentifier(NormalsId));
+                CopyBoxes(c, normalsFull, normalsHist);
+            }
+            GpuTimer.Mark(c, 4);
 
             // Un-jittered matrices for the rest of the chain, set in the command stream. (The camera itself must keep its jittered projection:
             // the pipeline reads it when the frame's commands run, so changing it here would remove the jitter from the whole scene.)
@@ -252,7 +342,7 @@ namespace WotRDLSS
         // Exact, un-jittered character silhouettes in the stencil of the full-resolution depth buffer (see ObjectMv.DrawCharacterMask).
         static void CharacterMask(ScriptableRenderContext ctx, ref RenderingData rd, Camera cam)
         {
-            if (depthUpMat == null) return;
+            if (depthUpMat == null || boxes.Count == 0) return;
             ObjectMv.DrawCharacterMask(ctx, ref rd, DepthId, Jitter.Applied ? Jitter.BaseProjection : cam.projectionMatrix);
         }
 
@@ -286,7 +376,7 @@ namespace WotRDLSS
             UpscaleDepth(cb, cd, w, h, cam, true);
             ctx.ExecuteCommandBuffer(cb);
             CharacterMask(ctx, ref rd, cam);
-            GpuTimer.Mark(ctx, 3);
+            GpuTimer.Mark(ctx, 5);
 
             // The post-processing chain allocates its buffers from this descriptor, so it now has to describe the full-resolution image.
             var d = (RenderTextureDescriptor)descriptorField.GetValue(pass);
@@ -329,7 +419,7 @@ namespace WotRDLSS
             UpscaleDepth(cb, cd, w, h, cam, ok);
             ctx.ExecuteCommandBuffer(cb);
             CharacterMask(ctx, ref rd, cam);
-            GpuTimer.Mark(ctx, 3);
+            GpuTimer.Mark(ctx, 5);
             Scaler.PostDlss = true;
             HdrFrame = Time.frameCount;
             Scaler.MainFrame = Time.frameCount;

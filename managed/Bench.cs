@@ -10,8 +10,8 @@ namespace WotRDLSS
 {
     // GPU timestamps at fixed points of a frame (see the native DoMark). Only issued while the benchmark runs.
     //   0 start of the main camera   1 start of the DLSS stage   2 end of the DLSS stage (motion vectors + evaluate)
-    //   3 end of the full-resolution depth/normals/stencil rebuild for the ground markers
-    //   4 end of the main camera     7 end of the UI camera
+    //   3 full-resolution depth and stencil done   4 held depth and normals for the ground markers done   5 character mask done
+    //   6 end of the main camera     7 end of the UI camera
     public static class GpuTimer
     {
         public static bool On;
@@ -37,7 +37,7 @@ namespace WotRDLSS
 
         public static void CameraEnd(ScriptableRenderContext ctx, Camera cam)
         {
-            if (On && Relevant(cam)) Mark(ctx, Scaler.IsUiCamera(cam) ? 7 : 4);
+            if (On && Relevant(cam)) Mark(ctx, Scaler.IsUiCamera(cam) ? 7 : 6);
         }
     }
 
@@ -122,7 +122,7 @@ namespace WotRDLSS
             Main.Log("BENCH start: " + head);
             report.AppendLine("WotR DLSS benchmark: " + head + ", " + DateTime.Now.ToString("yyyy-MM-dd HH:mm"));
             report.AppendLine("Stages (GPU ms per frame): pre = scene before the DLSS stage, dlss = motion vectors + evaluate, marker = full-res depth/normals/stencil rebuild,");
-            report.AppendLine("post = rest of the main camera (full-res post-processing in the HDR path, decals, outlines), ui = UI camera, gpu = whole frame, eval = DLSS evaluate alone.");
+            report.AppendLine("depth/hold/mask = the full-res depth + stencil, the held depth + normals, and the character mask for the ground markers; post = rest of the main camera (full-res post-processing in the HDR path, decals, outlines), ui = UI camera, gpu = whole frame, eval = DLSS evaluate alone.");
             report.AppendLine("A mode without DLSS reports everything of the main camera under 'post'.");
             report.AppendLine();
 
@@ -165,13 +165,14 @@ namespace WotRDLSS
                 float avgFps = (float)(dts.Count / sum);
                 float p50 = sorted[sorted.Length / 2] * 1000f;
                 float p99 = sorted[Math.Min(sorted.Length - 1, (int)(sorted.Length * 0.99f))] * 1000f;
-                double pre, dl, mk, post, ui, tot, ev = 0; ulong n;
-                bool g1 = Dlss.FrameTimingMs(1, out pre, out n), g2 = Dlss.FrameTimingMs(2, out dl, out n), g3 = Dlss.FrameTimingMs(3, out mk, out n);
-                bool g4 = Dlss.FrameTimingMs(4, out post, out n), g7 = Dlss.FrameTimingMs(7, out ui, out n), g8 = Dlss.FrameTimingMs(8, out tot, out n);
+                double pre, dl, dp, hd, mk, post, ui, tot, ev = 0; ulong n;
+                bool g1 = Dlss.FrameTimingMs(1, out pre, out n), g2 = Dlss.FrameTimingMs(2, out dl, out n), g3 = Dlss.FrameTimingMs(3, out dp, out n);
+                bool g4 = Dlss.FrameTimingMs(4, out hd, out n), g5 = Dlss.FrameTimingMs(5, out mk, out n), g6 = Dlss.FrameTimingMs(6, out post, out n);
+                bool g7 = Dlss.FrameTimingMs(7, out ui, out n), g8 = Dlss.FrameTimingMs(8, out tot, out n);
                 bool ge = st.enabled && st.dlss && Dlss.EvalMs(out ev, out n);
                 ulong use, budget; bool vram = Dlss.VramMB(out use, out budget);
-                string line = string.Format("{0,-44} {1,6:F1} fps  med {2,6:F2} ms  1% low {3,6:F1} fps | GPU pre {4} dlss {5} marker {6} post {7} ui {8} = {9} ms (eval {10}) | VRAM {11}",
-                    st.name, avgFps, p50, 1000f / p99, Ms(g1 ? pre : 0), Ms(g2 ? dl : 0), Ms(g3 ? mk : 0), Ms(g4 ? post : 0), Ms(g7 ? ui : 0), Ms(g8 ? tot : 0), ge ? ev.ToString("F2") : "n/a", vram ? use + " MB" : "n/a");
+                string line = string.Format("{0,-44} {1,6:F1} fps  med {2,6:F2} ms  1% low {3,6:F1} fps | GPU pre {4} dlss {5} | depth {6} hold {7} mask {8} | post {9} ui {10} = {11} ms (eval {12}) | VRAM {13}",
+                    st.name, avgFps, p50, 1000f / p99, Ms(g1 ? pre : 0), Ms(g2 ? dl : 0), Ms(g3 ? dp : 0), Ms(g4 ? hd : 0), Ms(g5 ? mk : 0), Ms(g6 ? post : 0), Ms(g7 ? ui : 0), Ms(g8 ? tot : 0), ge ? ev.ToString("F2") : "n/a", vram ? use + " MB" : "n/a");
                 report.AppendLine(line);
                 Main.Log("BENCH " + line);
             }
