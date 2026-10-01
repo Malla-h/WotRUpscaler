@@ -48,6 +48,19 @@ Shader "Hidden/WotRDLSS/ObjectMotionVectors"
     // Characters and what they carry: skinned meshes with previous-frame positions (x = 1), and rigid pieces (potions on a belt,
     // weapons, carried props) whose previous transform is valid and differs from the current one. Static scenery has identical
     // transforms; its motion is the camera motion, which the camera pass already provides.
+    // Some objects (instanced or batched props, effects) carry a previous transform that is not a record of last frame at all (an identity
+    // matrix, for instance): it differs from the current one by the object's whole distance from the world origin, which came out as
+    // motion of thousands of pixels. Real per-frame motion is small, so a previous transform far from the current one is not trusted.
+    bool PrevMatrixSane()
+    {
+        float4x4 pm = unity_MatrixPreviousM;
+        float4x4 cm = unity_ObjectToWorld;
+        float lin = 0.0;
+        [unroll] for (int r = 0; r < 3; r++) lin += dot(abs(pm[r].xyz - cm[r].xyz), float3(1.0, 1.0, 1.0));
+        float3 tr = float3(pm[0].w - cm[0].w, pm[1].w - cm[1].w, pm[2].w - cm[2].w);
+        return lin < 1.5 && dot(tr, tr) < 16.0;
+    }
+
     bool IsCharacterPart(out bool skinned)
     {
         skinned = unity_MotionVectorsParams.x > 0.5;
@@ -56,7 +69,7 @@ Shader "Hidden/WotRDLSS/ObjectMotionVectors"
         bool validPrev = abs(pm[3][3] - 1.0) < 1e-3 && abs(pm[3][0]) + abs(pm[3][1]) + abs(pm[3][2]) < 1e-3;
         float3 dt = abs(pm[0] - cm[0]).xyz + abs(pm[1] - cm[1]).xyz + abs(pm[2] - cm[2]).xyz;
         float dw = abs(pm[0].w - cm[0].w) + abs(pm[1].w - cm[1].w) + abs(pm[2].w - cm[2].w);
-        bool rigidMoving = !skinned && validPrev && (dt.x + dt.y + dt.z + dw) > 1e-5;
+        bool rigidMoving = !skinned && validPrev && (dt.x + dt.y + dt.z + dw) > 1e-5 && PrevMatrixSane();
         return (skinned || rigidMoving) && unity_MotionVectorsParams.y > 0.5;
     }
     ENDHLSL
@@ -98,7 +111,9 @@ Shader "Hidden/WotRDLSS/ObjectMotionVectors"
                 bool skinned;
                 bool draw = IsCharacterPart(skinned);
                 float3 old = skinned ? v.oldPos : v.vertex;
-                o.prev = mul(_WotRPreviousVP, mul(unity_MatrixPreviousM, float4(old, 1.0)));
+                // A skinned mesh with an untrustworthy previous transform keeps its skinning motion (old vertex position) only.
+                float4x4 pmat = PrevMatrixSane() ? unity_MatrixPreviousM : unity_ObjectToWorld;
+                o.prev = mul(_WotRPreviousVP, mul(pmat, float4(old, 1.0)));
                 if (_WotRDebug < 0.5 && !draw)
                     o.pos = float4(2.0, 2.0, 2.0, 1.0);
                 o.dbg = unity_MotionVectorsParams;
