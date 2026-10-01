@@ -52,6 +52,7 @@ namespace WotRDLSS
             {   // developer-only switches never stay active from an old settings file
                 S.noJitter = false; S.jitSx = -1f; S.jitSy = -1f; S.mvSignX = 1f; S.mvSignY = 1f; S.objSignX = 1f; S.objSignY = 1f;
                 S.debugFullMarkerBuffers = S.debugCharMv = S.debugStats = false;
+                S.characterMotion = true;
                 S.holdTolerance = 0.004f;
             }
             entry.OnGUI = OnGUI;
@@ -83,25 +84,35 @@ namespace WotRDLSS
             foreach (var p in Presets.Modes)
             {
                 bool on = Mathf.Abs(S.renderScale - p.Scale) < 0.005f;
-                if (GUILayout.Toggle(on, p.Name + " (" + p.Scale.ToString("0.##") + "x)", GUI.skin.button) && !on) S.renderScale = p.Scale;
+                if (GUILayout.Toggle(on, p.Label, GUI.skin.button) && !on) S.renderScale = p.Scale;
             }
             GUILayout.EndHorizontal();
 
-            S.dlss = GUILayout.Toggle(S.dlss, "Use DLSS (off = plain upscale)");
-            GUILayout.Label(Dlss.Describe());
-            GUILayout.Label("DLSS preset");
+            GUILayout.Label("Upscaler");
             GUILayout.BeginHorizontal();
-            foreach (var p in Presets.DlssPresets)
+            for (int i = 0; i < Upscalers.All.Length; i++)
             {
-                bool on = S.preset == p.Value;
-                if (GUILayout.Toggle(on, p.Name, GUI.skin.button) && !on) S.preset = p.Value;
+                bool on = Upscalers.Index(S) == i;
+                if (GUILayout.Toggle(on, Upscalers.All[i].Name, GUI.skin.button) && !on) Upscalers.Select(S, i);
             }
             GUILayout.EndHorizontal();
-            GUILayout.Label(Presets.DlssInfo(S.preset));
+            GUILayout.Label(Upscalers.All[Upscalers.Index(S)].Info);
+            if (S.dlss)
+            {
+                GUILayout.Label(Dlss.Describe());
+                GUILayout.Label("DLSS preset");
+                GUILayout.BeginHorizontal();
+                foreach (var p in Presets.DlssPresets)
+                {
+                    bool on = S.preset == p.Value;
+                    if (GUILayout.Toggle(on, p.Name, GUI.skin.button) && !on) S.preset = p.Value;
+                }
+                GUILayout.EndHorizontal();
+                GUILayout.Label(Presets.DlssInfo(S.preset));
+            }
             S.showAdvanced = GUILayout.Toggle(S.showAdvanced, "Advanced options");
             if (S.showAdvanced)
             {
-                S.characterMotion = GUILayout.Toggle(S.characterMotion, "Per-object motion vectors for characters (" + ObjectMv.Status + ")");
                 S.disableGameAA = GUILayout.Toggle(S.disableGameAA, "Switch the game's SMAA/FXAA off while DLSS is active");
                 S.mipAuto = GUILayout.Toggle(S.mipAuto, "Texture mip bias: auto (log2(scale) - 1, follows the render scale)");
                 GUILayout.Label("Applied mip bias: " + MipBias.Current.ToString("F2") + (S.mipAuto ? "" : "   manual strength " + S.mipStrength.ToString("F2") + " of the recommended"));
@@ -126,6 +137,7 @@ namespace WotRDLSS
                 if (S.debug)
                 {
                     GUILayout.Label("Developer tools");
+                    S.characterMotion = GUILayout.Toggle(S.characterMotion, "Per-object motion vectors for characters (" + ObjectMv.Status + ")");
                     S.noJitter = GUILayout.Toggle(S.noJitter, "No jitter");
                     GUILayout.BeginHorizontal();
                     if (GUILayout.Button("Jitter X " + S.jitSx)) S.jitSx = -S.jitSx;

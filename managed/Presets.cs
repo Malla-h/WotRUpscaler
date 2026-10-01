@@ -4,12 +4,18 @@ namespace WotRDLSS
     // preset NVIDIA adds later keeps working: it can be typed in as a number, and showing it costs one new line in the table below.
     public static class Presets
     {
-        public struct Mode { public string Name; public float Scale; public Mode(string name, float scale) { Name = name; Scale = scale; } }
+        public struct Mode
+        {
+            public string Name; public float Scale;
+            public Mode(string name, float scale) { Name = name; Scale = scale; }
+            // "Quality (0.67x)"; native resolution runs the upscaler as anti-aliasing only, so it carries no multiplier.
+            public string Label { get { return Scale >= 0.999f ? Name : Name + " (" + Scale.ToString("0.##") + "x)"; } }
+        }
 
         // DLSS quality modes and their render-scale multipliers (Ultra Quality is the non-standard 0.77 step).
         public static readonly Mode[] Modes =
         {
-            new Mode("Native", 1f),
+            new Mode("Native (DLAA)", 1f),
             new Mode("Ultra Quality", 0.77f),
             new Mode("Quality", 0.6667f),
             new Mode("Balanced", 0.58f),
@@ -30,14 +36,15 @@ namespace WotRDLSS
             public Preset(int value, string name, string info) { Value = value; Name = name; Info = info; }
         }
 
-        // NGX render presets (values from NVIDIA's nvsdk_ngx_defs.h). The costs are GPU time of the DLSS pass measured on an RTX 5060 at 4K.
+        // NGX render presets (values from NVIDIA's nvsdk_ngx_defs.h), in the order the menus list them.
+        public const int Recommended = 11;
         public static readonly Preset[] DlssPresets =
         {
-            new Preset(11, "K", "K: the best image quality and the recommended choice. Cheap (about 3.5 ms at 4K on an RTX 5060)."),
+            new Preset(0, "Automatic", "Automatic: NVIDIA chooses the preset per quality mode, and may change it with driver updates."),
+            new Preset(11, "K (recommended)", "K: the best image quality and the recommended choice. Lighter on the GPU than L and M."),
             new Preset(10, "J", "J: like K, with slightly less ghosting at the cost of a little more flicker."),
-            new Preset(12, "L", "L: NVIDIA's default for Ultra Performance mode. Costs 2 to 3 times as much GPU time as K."),
-            new Preset(13, "M", "M: NVIDIA's default for Performance mode. Costs about twice as much GPU time as K."),
-            new Preset(0, "Automatic", "Automatic: NVIDIA chooses per quality mode, and may change it with driver updates."),
+            new Preset(12, "L", "L: NVIDIA's default for Ultra Performance mode. Heavier on the GPU than K."),
+            new Preset(13, "M", "M: NVIDIA's default for Performance mode. Heavier on the GPU than K."),
         };
 
         // Index in DlssPresets, or -1 when the number is not in the table.

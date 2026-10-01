@@ -21,7 +21,7 @@ namespace WotRDLSS
         static int lastTry = -1000;
         static readonly Dictionary<string, object> shown = new Dictionary<string, object>();
         static readonly List<KeyValuePair<string, string>> strings = new List<KeyValuePair<string, string>>();
-        const int KeyCount = 9;
+        const int KeyCount = 8;
 
         static LocalizedString Str(string key, string text)
         {
@@ -66,7 +66,7 @@ namespace WotRDLSS
         static void Register()
         {
             var info = Main.Mod.Info;
-            var b = SettingsBuilder.New("wotrdlss", Str("wotrdlss.title", "DLSS"))
+            var b = SettingsBuilder.New("wotrdlss", Str("wotrdlss.title", "Upscaling"))
                 .SetMod(Main.Mod, false, false)
                 .SetModName(Str("wotrdlss.name", "WotR DLSS"))
                 .SetModDescription(Str("wotrdlss.description", "Renders the 3D scene at a lower resolution and upscales it with NVIDIA DLSS. The interface stays at full resolution."))
@@ -77,12 +77,23 @@ namespace WotRDLSS
                 .WithLongDescription(Str("wotrdlss.enabled.long", "Renders the 3D scene at a lower resolution and upscales it. Off: the game renders as usual."))
                 .OnValueChanged(v => Changed("enabled", v)));
 
+            // One entry per upscaler (see Upscalers). Options that belong to a single upscaler sit in a section of their own below.
+            var ups = new List<LocalizedString>();
+            var upTip = new StringBuilder("How the lower-resolution 3D scene is turned back into a sharp image.");
+            for (int i = 0; i < Upscalers.All.Length; i++)
+            {
+                ups.Add(Str("wotrdlss.upscaler." + i, Upscalers.All[i].Name));
+                upTip.Append("\n").Append(Upscalers.All[i].Name).Append(": ").Append(Upscalers.All[i].Info);
+            }
+            b.AddDropdownList(DropdownList.New("wotrdlss.upscaler", 0, Str("wotrdlss.upscaler", "Upscaler"), ups)
+                .WithLongDescription(Str("wotrdlss.upscaler.long", upTip.ToString()))
+                .OnValueChanged(v => Changed("upscaler", v)));
+
             var modes = new List<LocalizedString>();
-            for (int i = 0; i < Presets.Modes.Length; i++)
-                modes.Add(Str("wotrdlss.mode." + i, Presets.Modes[i].Name + " (" + Presets.Modes[i].Scale.ToString("0.##") + "x)"));
+            for (int i = 0; i < Presets.Modes.Length; i++) modes.Add(Str("wotrdlss.mode." + i, Presets.Modes[i].Label));
             modes.Add(Str("wotrdlss.mode.custom", "Custom (use the slider)"));
             b.AddDropdownList(DropdownList.New("wotrdlss.mode", Presets.ModeIndex(0.6667f), Str("wotrdlss.mode", "Quality mode"), modes)
-                .WithLongDescription(Str("wotrdlss.mode.long", "How far below the screen resolution the 3D scene is rendered. Lower is faster, higher is sharper. The number is the multiplier of the screen resolution."))
+                .WithLongDescription(Str("wotrdlss.mode.long", "How far below the screen resolution the 3D scene is rendered. Lower is faster, higher is sharper. Native (DLAA) renders at full resolution and uses the upscaler only for anti-aliasing."))
                 .OnValueChanged(v => Changed("mode", v)));
 
             b.AddSliderFloat(SliderFloat.New("wotrdlss.scale", 0.6667f, Str("wotrdlss.scale", "Render scale"), 0.33f, 1f)
@@ -90,33 +101,26 @@ namespace WotRDLSS
                 .WithLongDescription(Str("wotrdlss.scale.long", "The multiplier of the screen resolution that the 3D scene is rendered at. Picking a quality mode sets it; moving the slider selects Custom."))
                 .OnValueChanged(v => Changed("scale", v)));
 
-            b.AddToggle(Toggle.New("wotrdlss.dlss", true, Str("wotrdlss.dlss", "Use DLSS"))
-                .WithLongDescription(Str("wotrdlss.dlss.long", "Off: the lower-resolution image is only stretched to the screen size (for comparison)."))
-                .OnValueChanged(v => Changed("dlss", v)));
-
+            b.AddSubHeader(Str("wotrdlss.dlss.header", "NVIDIA DLSS"), true);
             var presets = new List<LocalizedString>();
             var tip = new StringBuilder("Which DLSS model runs.");
             for (int i = 0; i < Presets.DlssPresets.Length; i++)
             {
-                var p = Presets.DlssPresets[i];
-                presets.Add(Str("wotrdlss.preset." + i, p.Value == 11 ? p.Name + " (recommended)" : p.Name));
-                tip.Append("\n").Append(p.Info);
+                presets.Add(Str("wotrdlss.preset." + i, Presets.DlssPresets[i].Name));
+                tip.Append("\n").Append(Presets.DlssPresets[i].Info);
             }
             presets.Add(Str("wotrdlss.preset.other", "Other (number set in the Mods panel)"));
             tip.Append("\nOther: a preset number outside this list, typed into the Mods panel (Ctrl+F10), for presets NVIDIA adds later.");
-            b.AddDropdownList(DropdownList.New("wotrdlss.preset", Presets.DlssIndex(11), Str("wotrdlss.preset", "DLSS preset"), presets)
+            b.AddDropdownList(DropdownList.New("wotrdlss.preset", Presets.DlssIndex(Presets.Recommended), Str("wotrdlss.preset", "DLSS preset"), presets)
                 .WithLongDescription(Str("wotrdlss.preset.long", tip.ToString()))
                 .OnValueChanged(v => Changed("preset", v)));
+            b.AddToggle(Toggle.New("wotrdlss.hdr", true, Str("wotrdlss.hdr", "Run DLSS before post-processing (HDR input)"))
+                .WithLongDescription(Str("wotrdlss.hdr.long", "Gives DLSS the unprocessed scene, so bloom, depth of field and colour grading work at full resolution. Costs a little performance. Off: DLSS runs on the finished image."))
+                .OnValueChanged(v => Changed("hdr", v)));
 
             b.AddSubHeader(Str("wotrdlss.advanced", "More options"), false);
-            b.AddToggle(Toggle.New("wotrdlss.hdr", true, Str("wotrdlss.hdr", "Run DLSS before post-processing (HDR input)"))
-                .WithLongDescription(Str("wotrdlss.hdr.long", "Gives DLSS the unprocessed scene, so bloom, depth of field and colour grading work at full resolution. Costs a little performance (about 0.7 ms at 4K). Off: DLSS runs on the finished image."))
-                .OnValueChanged(v => Changed("hdr", v)));
-            b.AddToggle(Toggle.New("wotrdlss.charmv", true, Str("wotrdlss.charmv", "Motion vectors for characters"))
-                .WithLongDescription(Str("wotrdlss.charmv.long", "Tells DLSS how characters move, which removes ghosting on moving characters. Costs very little."))
-                .OnValueChanged(v => Changed("charmv", v)));
-            b.AddToggle(Toggle.New("wotrdlss.smaa", true, Str("wotrdlss.smaa", "Switch the game's SMAA off while DLSS is on"))
-                .WithLongDescription(Str("wotrdlss.smaa.long", "DLSS does its own anti-aliasing; the game's SMAA would only soften the image DLSS receives."))
+            b.AddToggle(Toggle.New("wotrdlss.smaa", true, Str("wotrdlss.smaa", "Switch the game's SMAA off while upscaling"))
+                .WithLongDescription(Str("wotrdlss.smaa.long", "The upscaler does its own anti-aliasing; the game's SMAA would only soften the image it receives."))
                 .OnValueChanged(v => Changed("smaa", v)));
             b.AddToggle(Toggle.New("wotrdlss.mip", true, Str("wotrdlss.mip", "Automatic texture sharpening"))
                 .WithLongDescription(Str("wotrdlss.mip.long", "Lowers the texture mip bias to match the render scale, as upscalers expect, so textures stay sharp."))
@@ -146,7 +150,7 @@ namespace WotRDLSS
                         if (Mathf.Abs(f - s.renderScale) > 0.004f) s.renderScale = f;
                         break;
                     }
-                case "dlss": s.dlss = (bool)v; break;
+                case "upscaler": Upscalers.Select(s, (int)v); break;
                 case "preset":
                     {
                         int i = (int)v;
@@ -154,7 +158,6 @@ namespace WotRDLSS
                         break;
                     }
                 case "hdr": s.dlssBeforePost = (bool)v; break;
-                case "charmv": s.characterMotion = (bool)v; break;
                 case "smaa": s.disableGameAA = (bool)v; break;
                 case "mip": s.mipAuto = (bool)v; break;
             }
@@ -176,11 +179,10 @@ namespace WotRDLSS
                 int mi = Presets.ModeIndex(s.renderScale);
                 PushInt("mode", mi < 0 ? Presets.Modes.Length : mi);
                 PushFloat("scale", s.renderScale);
-                PushBool("dlss", s.dlss);
+                PushInt("upscaler", Upscalers.Index(s));
                 int pi = Presets.DlssIndex(s.preset);
                 PushInt("preset", pi < 0 ? Presets.DlssPresets.Length : pi);
                 PushBool("hdr", s.dlssBeforePost);
-                PushBool("charmv", s.characterMotion);
                 PushBool("smaa", s.disableGameAA);
                 PushBool("mip", s.mipAuto);
                 synced = shown.Count >= KeyCount;
