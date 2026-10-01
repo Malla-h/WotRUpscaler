@@ -21,7 +21,7 @@ namespace WotRDLSS
         public float mvSignX = 1f, mvSignY = 1f; // motion vector scale: the texture holds previous minus current position, which is what DLSS expects
         public bool mipAuto = true;           // follow the recommended bias for the current render scale
         public float mipStrength = 1f;        // fraction of the recommended texture LOD bias (log2(scale) - 1)
-        public bool disableGameAA = true;     // switch the game's SMAA off while DLSS is active
+        public bool disableGameAA = true;     // switch the game's SMAA and FXAA off while DLSS is active
         public bool characterMotion = true;   // per-object motion vectors for characters (needs the wotrdlss shader bundle)
         public float objSignX = 1f, objSignY = 1f;
         public float markerEdgeGapPx = 0.5f;            // the ground markers stop this many output pixels short of characters (covers their anti-aliased edge)
@@ -113,7 +113,7 @@ namespace WotRDLSS
             S.showAdvanced = GUILayout.Toggle(S.showAdvanced, "Advanced options");
             if (S.showAdvanced)
             {
-                S.disableGameAA = GUILayout.Toggle(S.disableGameAA, "Switch the game's SMAA/FXAA off while DLSS is active");
+                S.disableGameAA = GUILayout.Toggle(S.disableGameAA, "Switch off the game's SMAA and FXAA while an AI upscaler is on");
                 S.mipAuto = GUILayout.Toggle(S.mipAuto, "Texture mip bias: auto (log2(scale) - 1, follows the render scale)");
                 GUILayout.Label("Applied mip bias: " + MipBias.Current.ToString("F2") + (S.mipAuto ? "" : "   manual strength " + S.mipStrength.ToString("F2") + " of the recommended"));
                 if (!S.mipAuto) S.mipStrength = GUILayout.HorizontalSlider(S.mipStrength, 0f, 1.5f);

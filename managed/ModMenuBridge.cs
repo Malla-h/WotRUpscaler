@@ -119,8 +119,8 @@ namespace WotRDLSS
                 .OnValueChanged(v => Changed("hdr", v)));
 
             b.AddSubHeader(Str("wotrdlss.advanced", "More options"), false);
-            b.AddToggle(Toggle.New("wotrdlss.smaa", true, Str("wotrdlss.smaa", "Switch the game's SMAA off while upscaling"))
-                .WithLongDescription(Str("wotrdlss.smaa.long", "The upscaler does its own anti-aliasing; the game's SMAA would only soften the image it receives."))
+            b.AddToggle(Toggle.New("wotrdlss.smaa", true, Str("wotrdlss.smaa", "Switch off the game's SMAA and FXAA while an AI upscaler is on"))
+                .WithLongDescription(Str("wotrdlss.smaa.long", "The upscaler does its own anti-aliasing; the game's SMAA or FXAA would only soften the image it receives."))
                 .OnValueChanged(v => Changed("smaa", v)));
             b.AddToggle(Toggle.New("wotrdlss.mip", true, Str("wotrdlss.mip", "Automatic texture sharpening"))
                 .WithLongDescription(Str("wotrdlss.mip.long", "Lowers the texture mip bias to match the render scale, as upscalers expect, so textures stay sharp."))

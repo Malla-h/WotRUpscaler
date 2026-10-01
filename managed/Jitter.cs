@@ -94,7 +94,8 @@ namespace WotRDLSS
             VPPrevious = (HavePrevious && !gap && !ResetPending) ? lastVP : VPCurrent;
             applied = true;
 
-            // The game's SMAA would run on the low-resolution image before DLSS and soften what DLSS gets to work with.
+            // The game's SMAA or FXAA (whichever the camera uses: both are values of the same antialiasing mode) would run on the image around
+            // DLSS and soften what DLSS gets to work with.
             aaData = null;
             if (Main.S.disableGameAA && Dlss.Ready)
             {

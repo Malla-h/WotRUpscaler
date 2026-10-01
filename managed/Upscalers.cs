@@ -14,7 +14,7 @@ namespace WotRDLSS
         public static readonly Upscaler[] All =
         {
             new Upscaler("dlss", "NVIDIA DLSS", "Needs an NVIDIA RTX graphics card."),
-            new Upscaler("plain", "Basic scaling (no AI)", "The 3D scene is rendered smaller and stretched to the screen size, for comparison."),
+            new Upscaler("plain", "Basic scaling (no AI)", "The 3D scene is rendered smaller and stretched to the screen size."),
         };
 
         public static int Index(Settings s) { return s.dlss ? 0 : 1; }
