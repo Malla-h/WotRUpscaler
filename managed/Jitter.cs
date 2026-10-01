@@ -57,6 +57,7 @@ namespace WotRDLSS
 
         static void OnBegin(ScriptableRenderContext ctx, Camera cam)
         {
+            GpuTimer.CameraBegin(ctx, cam);
             applied = false;
             Scaler.PostDlss = false;
             if (!Scaler.IsScaled(cam)) return;
@@ -104,6 +105,7 @@ namespace WotRDLSS
 
         static void OnEnd(ScriptableRenderContext ctx, Camera cam)
         {
+            GpuTimer.CameraEnd(ctx, cam);
             if (!applied || !Scaler.IsScaled(cam)) return;
             Scaler.PostDlss = false;
             if (aaData != null) { aaData.Antialiasing = aaOrig; aaData = null; }

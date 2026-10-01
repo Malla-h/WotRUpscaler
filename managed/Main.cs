@@ -58,7 +58,7 @@ namespace WotRDLSS
             entry.OnUpdate = (e, dt) => Scaler.Update();
             entry.OnToggle = (e, on) => { S.enabled = on; Scaler.Update(); return true; };
             harmony = new Harmony("wotr.dlss");
-            try { harmony.PatchAll(Assembly.GetExecutingAssembly()); PixelSize.Apply(harmony); Jitter.Install(); var go = new GameObject("WotRDLSS"); UnityEngine.Object.DontDestroyOnLoad(go); go.AddComponent<MipBias>(); Log("patched"); }
+            try { harmony.PatchAll(Assembly.GetExecutingAssembly()); PixelSize.Apply(harmony); Jitter.Install(); var go = new GameObject("WotRDLSS"); UnityEngine.Object.DontDestroyOnLoad(go); go.AddComponent<MipBias>(); go.AddComponent<Bench>(); Log("patched"); }
             catch (Exception ex) { Log("patch failed: " + ex); return false; }
             return true;
         }
@@ -130,6 +130,7 @@ namespace WotRDLSS
                     GUILayout.BeginHorizontal();
                     if (GUILayout.Button("Capture 4 frames in 8 s", GUILayout.Width(260))) Capture.Arm(8f);
                     if (GUILayout.Button("Probe ground markers in 8 s", GUILayout.Width(220))) DecalProbe.Arm(8f);
+                    if (GUILayout.Button("Benchmark in 8 s (about 3 min)", GUILayout.Width(260))) Bench.Arm(8f);
                     if (GUILayout.Button("Character census", GUILayout.Width(200))) { try { MipBias.Census(); } catch (System.Exception ex) { Log("census failed " + ex); } }
                     GUILayout.Label(Capture.Status);
                     GUILayout.EndHorizontal();

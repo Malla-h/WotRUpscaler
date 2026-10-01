@@ -114,6 +114,7 @@ namespace WotRDLSS
 
             int rw = cd.width, rh = cd.height;
             cb.Clear();
+            GpuTimer.Mark(cb, 1);
             cb.CopyTexture(new RenderTargetIdentifier(srcId), colorIn);
             cb.CopyTexture(new RenderTargetIdentifier(DepthId), depthCopy);
             Dlss.QueueCameraMv(cb, depthCopy, motion, rw, rh);
@@ -129,6 +130,7 @@ namespace WotRDLSS
             Jitter.ResetPending = false;
             Dlss.QueueEval(cb, colorIn, depthCopy, motion, Full, rw, rh, reset);
             Capture.Queue(cb, colorIn, motion, objects ? ObjectMv.Target : null, Full, rw, rh, reset);
+            GpuTimer.Mark(cb, 2);
             ctx.ExecuteCommandBuffer(cb);
             return true;
         }
@@ -284,6 +286,7 @@ namespace WotRDLSS
             UpscaleDepth(cb, cd, w, h, cam, true);
             ctx.ExecuteCommandBuffer(cb);
             CharacterMask(ctx, ref rd, cam);
+            GpuTimer.Mark(ctx, 3);
 
             // The post-processing chain allocates its buffers from this descriptor, so it now has to describe the full-resolution image.
             var d = (RenderTextureDescriptor)descriptorField.GetValue(pass);
@@ -307,7 +310,9 @@ namespace WotRDLSS
             {
                 EnsureFull(cd, w, h);
                 cb.Clear();
+                GpuTimer.Mark(cb, 1);
                 cb.Blit(new RenderTargetIdentifier(AfterPP), Full);
+                GpuTimer.Mark(cb, 2);
                 ctx.ExecuteCommandBuffer(cb);
             }
 
@@ -324,6 +329,7 @@ namespace WotRDLSS
             UpscaleDepth(cb, cd, w, h, cam, ok);
             ctx.ExecuteCommandBuffer(cb);
             CharacterMask(ctx, ref rd, cam);
+            GpuTimer.Mark(ctx, 3);
             Scaler.PostDlss = true;
             HdrFrame = Time.frameCount;
             Scaler.MainFrame = Time.frameCount;

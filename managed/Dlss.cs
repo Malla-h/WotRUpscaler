@@ -17,6 +17,12 @@ namespace WotRDLSS
         [DllImport("WotRDLSSNative")] static extern int WotRDLSS_GetEvalCount();
         [DllImport("WotRDLSSNative")] static extern int WotRDLSS_StructSizes(int which);
         [DllImport("WotRDLSSNative")] static extern void WotRDLSS_SetDebugStats(int on);
+        [DllImport("WotRDLSSNative")] static extern void WotRDLSS_SetFrameTiming(int on);
+        [DllImport("WotRDLSSNative")] static extern void WotRDLSS_ResetFrameTiming();
+        [DllImport("WotRDLSSNative")] static extern int WotRDLSS_GetFrameTiming(int slot, out ulong us, out ulong n);
+        [DllImport("WotRDLSSNative")] static extern void WotRDLSS_ResetEvalTiming();
+        [DllImport("WotRDLSSNative")] static extern int WotRDLSS_GetEvalTiming(out ulong us, out ulong n);
+        [DllImport("WotRDLSSNative")] static extern int WotRDLSS_GetVramMB(out ulong usage, out ulong budget);
 
         [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
         struct CreateData
@@ -124,6 +130,37 @@ namespace WotRDLSS
         // Debug: pipeline statistics and D3D11 state of everything drawn between these two events (logged in the native log).
         public static void QueuePassBegin(CommandBuffer c, IntPtr anyTexture) { if (loaded) Issue(c, 7, anyTexture); }
         public static void QueuePassEnd(CommandBuffer c, IntPtr extraDepth) { if (loaded) Issue(c, 8, extraDepth); }
+
+        // Benchmark: GPU timestamps (see GpuTimer / the native DoMark) and the totals they produce.
+        public static void QueueMark(CommandBuffer c, int slot) { if (loaded) Issue(c, 9, (IntPtr)slot); }
+        public static void SetFrameTiming(bool on) { if (loaded) try { WotRDLSS_SetFrameTiming(on ? 1 : 0); } catch { } }
+        public static void ResetFrameTiming() { if (loaded) try { WotRDLSS_ResetFrameTiming(); } catch { } }
+        public static void ResetEvalTiming() { if (loaded) try { WotRDLSS_ResetEvalTiming(); } catch { } }
+
+        // Average GPU milliseconds of the section that ends at mark 'slot' (8 = first to last mark of the frame) since the last reset.
+        public static bool FrameTimingMs(int slot, out double ms, out ulong samples)
+        {
+            ms = 0; samples = 0;
+            if (!loaded) return false;
+            try { ulong us; if (WotRDLSS_GetFrameTiming(slot, out us, out samples) != 1 || samples == 0) return false; ms = us / (double)samples / 1000.0; return true; }
+            catch { return false; }
+        }
+
+        // Average GPU milliseconds of the DLSS evaluate call alone.
+        public static bool EvalMs(out double ms, out ulong samples)
+        {
+            ms = 0; samples = 0;
+            if (!loaded) return false;
+            try { ulong us; if (WotRDLSS_GetEvalTiming(out us, out samples) != 1 || samples == 0) return false; ms = us / (double)samples / 1000.0; return true; }
+            catch { return false; }
+        }
+
+        public static bool VramMB(out ulong use, out ulong budget)
+        {
+            use = budget = 0;
+            if (!loaded) return false;
+            try { return WotRDLSS_GetVramMB(out use, out budget) == 1; } catch { return false; }
+        }
 
         public static int QualityFor(float scale)
         {

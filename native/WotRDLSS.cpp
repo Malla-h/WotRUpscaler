@@ -695,6 +695,72 @@ static void DoShutdown()
     g_status = 0;
 }
 
+// ---- per-frame section timing (benchmark) ----
+// Marks 0..7 are timestamps taken at points of one frame of the camera chain (0 = start of the main camera, 7 = end of the UI camera);
+// the GPU time between consecutive marks that were hit is added to the section that ends at the later mark. Section 8 = first to last mark.
+struct FrameTs { ID3D11Query* disjoint = nullptr; ID3D11Query* ts[8] = {}; unsigned mask = 0; bool open = false, inflight = false; };
+static FrameTs g_fr[6];
+static int g_frOpen = -1;
+static std::atomic<int> g_frOn(0);
+static std::atomic<unsigned long long> g_secUs[9], g_secN[9];
+
+static bool EnsureFrameQueries(FrameTs& f)
+{
+    if (f.disjoint) return true;
+    D3D11_QUERY_DESC dd = { D3D11_QUERY_TIMESTAMP_DISJOINT, 0 }, td = { D3D11_QUERY_TIMESTAMP, 0 };
+    if (FAILED(g_device->CreateQuery(&dd, &f.disjoint))) return false;
+    for (auto& q : f.ts) if (FAILED(g_device->CreateQuery(&td, &q))) return false;
+    return true;
+}
+
+static void HarvestFrames()
+{
+    for (auto& f : g_fr)
+    {
+        if (!f.inflight) continue;
+        D3D11_QUERY_DATA_TIMESTAMP_DISJOINT dj;
+        if (g_ctx->GetData(f.disjoint, &dj, sizeof(dj), D3D11_ASYNC_GETDATA_DONOTFLUSH) != S_OK) continue;
+        UINT64 t[8] = {};
+        bool ok = !dj.Disjoint && dj.Frequency;
+        for (int i = 0; i < 8 && ok; i++)
+            if (f.mask & (1u << i)) ok = g_ctx->GetData(f.ts[i], &t[i], sizeof(UINT64), 0) == S_OK;
+        if (ok)
+        {
+            int prev = -1;
+            for (int i = 0; i < 8; i++)
+            {
+                if (!(f.mask & (1u << i))) continue;
+                if (prev >= 0) { g_secUs[i] += (unsigned long long)((t[i] - t[prev]) * 1000000.0 / (double)dj.Frequency); g_secN[i]++; }
+                prev = i;
+            }
+            if ((f.mask & 1u) && prev > 0) { g_secUs[8] += (unsigned long long)((t[prev] - t[0]) * 1000000.0 / (double)dj.Frequency); g_secN[8]++; }
+        }
+        f.inflight = false;
+    }
+}
+
+static void DoMark(void* data)
+{
+    int slot = (int)(intptr_t)data;
+    if (!g_frOn || !g_device || !g_ctx || slot < 0 || slot > 7) return;
+    if (slot == 0)
+    {
+        HarvestFrames();
+        if (g_frOpen >= 0) { FrameTs& o = g_fr[g_frOpen]; g_ctx->End(o.disjoint); o.open = false; o.inflight = true; g_frOpen = -1; }
+        for (int i = 0; i < 6; i++)
+            if (!g_fr[i].inflight && !g_fr[i].open && EnsureFrameQueries(g_fr[i])) { g_frOpen = i; break; }
+        if (g_frOpen < 0) return;
+        FrameTs& n = g_fr[g_frOpen];
+        n.mask = 0; n.open = true;
+        g_ctx->Begin(n.disjoint);
+    }
+    if (g_frOpen < 0) return;
+    FrameTs& f = g_fr[g_frOpen];
+    g_ctx->End(f.ts[slot]);
+    f.mask |= 1u << slot;
+    if (slot == 7) { g_ctx->End(f.disjoint); f.open = false; f.inflight = true; g_frOpen = -1; }
+}
+
 // Unity plugin event with data: eventId 1 = create/recreate, 2 = evaluate, 3 = shutdown, 4 = camera motion vectors from depth, 5 = merge object motion
 static void __stdcall OnEvent(int eventId, void* data)
 {
@@ -709,6 +775,7 @@ static void __stdcall OnEvent(int eventId, void* data)
         case 5: DoComposite(reinterpret_cast<CompData*>(data)); break;
         case 7: DoPassBegin(data); break;
         case 8: DoPassEnd(data); break;
+        case 9: DoMark(data); break;
         }
     }
     __except (EXCEPTION_EXECUTE_HANDLER)
@@ -760,5 +827,13 @@ EXPORT int WotRDLSS_GetVramMB(unsigned long long* usageMB, unsigned long long* b
 }
 
 EXPORT void WotRDLSS_SetDebugStats(int on) { g_debugStats = on; }
+EXPORT void WotRDLSS_SetFrameTiming(int on) { g_frOn = on; }
+EXPORT void WotRDLSS_ResetFrameTiming() { for (int i = 0; i < 9; i++) { g_secUs[i] = 0; g_secN[i] = 0; } }
+EXPORT int WotRDLSS_GetFrameTiming(int slot, unsigned long long* us, unsigned long long* n)
+{
+    if (slot < 0 || slot > 8) return 0;
+    *us = g_secUs[slot]; *n = g_secN[slot];
+    return g_device ? 1 : 0;
+}
 EXPORT int WotRDLSS_StructSizes(int which) { return which == 0 ? (int)sizeof(CreateData) : which == 1 ? (int)sizeof(EvalData) : which == 2 ? (int)sizeof(MvData) : (int)sizeof(CompData); }
 
