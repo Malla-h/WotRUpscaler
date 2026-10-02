@@ -226,7 +226,9 @@ Shader "Hidden/WotRUpscaler/ObjectMotionVectors"
                 o.prev = mul(_WotRPreviousVP, mul(pmat, float4(old, 1.0)));
                 if (_WotRDebug < 0.5 && !draw)
                     o.pos = float4(2.0, 2.0, 2.0, 1.0);
-                o.dbg = unity_MotionVectorsParams;
+                // The alpha says which path drew the pixel (all above the 0.5 the merge asks for): 1 characters and rigid parts, 0.9 physics
+                // skinned plants, 0.8 physics cloth. Only used to tell the paths apart in captures.
+                o.dbg = float4(unity_MotionVectorsParams.x, unity_MotionVectorsParams.y, pbd ? 0.9 : (cloth ? 0.8 : 1.0), unity_MotionVectorsParams.w);
                 return o;
             }
 
@@ -240,7 +242,7 @@ Shader "Hidden/WotRUpscaler/ObjectMotionVectors"
                 float2 c = i.cur.xy / i.cur.w;
                 float2 p = i.prev.xy / i.prev.w;
                 float2 mv = (p - c) * 0.5 * float2(_WotRSize.x, -_WotRSize.y);
-                return float4(mv, 0.0, 1.0);
+                return float4(mv, 0.0, i.dbg.z);
             }
             ENDHLSL
         }
@@ -347,7 +349,7 @@ Shader "Hidden/WotRUpscaler/ObjectMotionVectors"
                 float2 c = i.cur.xy / i.cur.w;
                 float2 p = i.prev.xy / i.prev.w;
                 float2 mv = (p - c) * 0.5 * float2(_WotRSize.x, -_WotRSize.y);
-                return float4(mv, 0.0, 1.0);
+                return float4(mv, 0.0, 0.7);
             }
             ENDHLSL
         }
