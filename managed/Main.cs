@@ -151,6 +151,7 @@ namespace WotRUpscaler
                     if (GUILayout.Button("Capture 4 frames in 8 s", GUILayout.Width(260))) Capture.Arm(8f);
                     if (GUILayout.Button("Probe ground markers in 8 s", GUILayout.Width(220))) DecalProbe.Arm(8f);
                     if (GUILayout.Button("Benchmark in 8 s (about 3 min)", GUILayout.Width(260))) Bench.Arm(8f);
+                    if (GUILayout.Button("Vegetation census", GUILayout.Width(200))) { try { VegetationCensus.Run(); } catch (System.Exception ex) { Log("vegetation census failed " + ex); } }
                     if (GUILayout.Button("Character census", GUILayout.Width(200))) { try { MipBias.Census(); } catch (System.Exception ex) { Log("census failed " + ex); } }
                     GUILayout.Label(Capture.Status);
                     GUILayout.EndHorizontal();
