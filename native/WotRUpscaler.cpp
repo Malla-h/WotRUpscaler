@@ -92,6 +92,15 @@ static void Log(const char* fmt, ...)
 
 static ID3D11Resource* Res(void* p) { return reinterpret_cast<ID3D11Resource*>(p); }
 
+// The device and immediate context are normally taken when DLSS is created; the plain GPU work (motion vectors, buffer copies) also runs
+// without DLSS (TAA mode, or on a graphics card that cannot run DLSS), so any resource handed over can supply them.
+static void EnsureDevice(void* resource)
+{
+    if (g_device || !resource) return;
+    reinterpret_cast<ID3D11DeviceChild*>(resource)->GetDevice(&g_device);   // AddRef'd, kept for the process lifetime
+    if (g_device) { g_device->GetImmediateContext(&g_ctx); Log("Got device %p context %p (from a resource)", g_device, g_ctx); }
+}
+
 static void ReleaseFeature()
 {
     if (g_feature) { NVSDK_NGX_D3D11_ReleaseFeature(g_feature); g_feature = nullptr; }
@@ -297,6 +306,7 @@ static bool EnsureMvShader()
 
 static void DoMotion(MvData* m)
 {
+    EnsureDevice(m->depth);
     if (!g_device || !g_ctx || !m->depth || !m->mv || !EnsureMvShader()) return;
     ID3D11Texture2D* dt = reinterpret_cast<ID3D11Texture2D*>(m->depth);
     ID3D11Texture2D* mt = reinterpret_cast<ID3D11Texture2D*>(m->mv);
@@ -410,6 +420,7 @@ static void ObjStats(ID3D11Texture2D* ot, const D3D11_TEXTURE2D_DESC& od)
 
 static void DoComposite(CompData* c)
 {
+    EnsureDevice(c->obj);
     if (!g_device || !g_ctx || !c->obj || !c->mv) return;
     if (!g_compCS)
     {
@@ -765,6 +776,7 @@ static void DoMark(void* data)
 struct CopyData { void* dst; void* src; };
 static void DoCopyBuffer(CopyData* d)
 {
+    if (d) EnsureDevice(d->src);
     if (!g_ctx || !d || !d->dst || !d->src) return;
     g_ctx->CopyResource(Res(d->dst), Res(d->src));
 }

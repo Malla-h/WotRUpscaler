@@ -103,16 +103,17 @@ namespace WotRUpscaler
             Main.Log("full-res target " + w + "x" + h + " " + Full.format + ", camera target " + cd.width + "x" + cd.height);
         }
 
-        // Runs motion vectors, optional object motion and the DLSS evaluate with srcId (render resolution) as colour, output in Full.
-        // Returns false while DLSS is not ready (the caller then falls back to a plain upscale).
+        // Runs motion vectors, optional object motion and the upscale (DLSS evaluate, or the TAA resolve) with srcId (render resolution) as
+        // colour, output in Full. Returns false while the upscaler is not ready (the caller then falls back to a plain upscale).
         static bool RunDlss(ScriptableRenderContext ctx, ref RenderingData rd, int srcId)
         {
             var cam = rd.CameraData.Camera;
             var cd = rd.CameraData.CameraTargetDescriptor;
             int w = cam.pixelWidth, h = cam.pixelHeight;
+            bool taa = Upscalers.IsTaa(Main.S);
             EnsureFull(cd, w, h);
             EnsureInputs(cd);
-            if (!Dlss.Tick(cd.width, cd.height, w, h, Full)) return false;
+            if (!(taa ? Taa.Tick(cd.width, cd.height, w, h) : Dlss.Tick(cd.width, cd.height, w, h, Full))) return false;
 
             int rw = cd.width, rh = cd.height;
             cb.Clear();
@@ -129,9 +130,10 @@ namespace WotRUpscaler
                 Dlss.QueueComposite(cb, ObjectMv.Target, motion, rw, rh);
                 PbdMotion.Snapshot(cb);
             }
-            bool reset = Jitter.ResetPending || Time.frameCount - Dlss.LastEvalFrame > 1;
+            bool reset = Jitter.ResetPending || Time.frameCount - (taa ? Taa.LastFrame : Dlss.LastEvalFrame) > 1;
             Jitter.ResetPending = false;
-            Dlss.QueueEval(cb, colorIn, depthCopy, motion, Full, rw, rh, reset);
+            if (taa) Taa.Resolve(cb, colorIn, depthCopy, motion, Full, rw, rh, w, h, reset);
+            else Dlss.QueueEval(cb, colorIn, depthCopy, motion, Full, rw, rh, reset);
             Capture.Queue(cb, colorIn, motion, objects ? ObjectMv.Target : null, Full, rw, rh, reset);
             GpuTimer.Mark(cb, 2);
             ctx.ExecuteCommandBuffer(cb);
@@ -396,13 +398,13 @@ namespace WotRUpscaler
             var cam = rd.CameraData.Camera;
             var cd = rd.CameraData.CameraTargetDescriptor;
             int w = cam.pixelWidth, h = cam.pixelHeight;
-            bool ok = Main.S.dlss && !Main.S.dlssBeforePost && RunDlss(ctx, ref rd, AfterPP);
+            bool ok = Upscalers.Temporal(Main.S) && !Main.S.dlssBeforePost && RunDlss(ctx, ref rd, AfterPP);
             if (!ok)
             {
                 EnsureFull(cd, w, h);
                 cb.Clear();
                 GpuTimer.Mark(cb, 1);
-                cb.Blit(new RenderTargetIdentifier(AfterPP), Full);
+                if (!Taa.Stretch(cb, new RenderTargetIdentifier(AfterPP), Full, w, h)) cb.Blit(new RenderTargetIdentifier(AfterPP), Full);
                 GpuTimer.Mark(cb, 2);
                 ctx.ExecuteCommandBuffer(cb);
             }
@@ -462,7 +464,7 @@ namespace WotRUpscaler
         static void Prefix(object __instance, ScriptableRenderContext context, ref RenderingData renderingData)
         {
             var cam = renderingData.CameraData.Camera;
-            if (!Scaler.IsScaled(cam) || !Main.S.dlss || !Main.S.dlssBeforePost || (bool)isFinal.GetValue(__instance)) return;
+            if (!Scaler.IsScaled(cam) || !Upscalers.Temporal(Main.S) || !Main.S.dlssBeforePost || (bool)isFinal.GetValue(__instance)) return;
             Upscale.BeforePost(context, ref renderingData, __instance, descriptor);
         }
 

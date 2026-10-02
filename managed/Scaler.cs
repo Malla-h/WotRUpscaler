@@ -28,16 +28,16 @@ namespace WotRUpscaler
         {
             var asset = OwlcatRenderPipeline.Asset;
             if (asset == null) return;
-            // If DLSS was chosen but cannot run (no RTX card, runtime file missing), the game keeps its normal renderer instead of showing a blurry
-            // stretched image; the panel says why and Retry DLSS tries again.
-            bool dlssUnavailable = Main.S.dlss && Dlss.Failed;
-            Active = Main.S.enabled && !dlssUnavailable && (Main.S.renderScale < 0.999f || Main.S.dlss);   // scale 1 with DLSS on is DLAA
+            // If the chosen upscaler cannot run (DLSS: no RTX card, runtime file missing), the game keeps its normal renderer instead of showing a
+            // blurry stretched image; the panel says why and Retry DLSS tries again.
+            bool dlssUnavailable = Upscalers.Unavailable(Main.S);
+            Active = Main.S.enabled && !dlssUnavailable && (Main.S.renderScale < 0.999f || Upscalers.Temporal(Main.S));   // scale 1 with DLSS on is DLAA
             Scale = Active ? Mathf.Clamp(Main.S.renderScale, 0.33f, 1f) : 1f;
             if (Active != loggedActive || dlssUnavailable != loggedUnavailable || (Active && Mathf.Abs(Scale - loggedScale) > 0.001f))
             {
                 loggedActive = Active; loggedUnavailable = dlssUnavailable; loggedScale = Scale;
-                Main.Log("scaling " + (Active ? "on at " + Scale.ToString("F3") + "x" : "off") + ", upscaler " + (Main.S.dlss ? "DLSS" : "Simple scaling")
-                    + (dlssUnavailable ? " (DLSS cannot run: " + Dlss.LastFailure + ")" : ""));
+                Main.Log("scaling " + (Active ? "on at " + Scale.ToString("F3") + "x" : "off") + ", upscaler " + Upscalers.Name(Main.S)
+                    + (dlssUnavailable ? " (cannot run: " + (Main.S.dlss ? Dlss.LastFailure : Taa.LastFailure) + ")" : ""));
             }
             // The pipeline truncates width * scale (3840 * 0.3333 = 1279); a tiny nudge makes exact fractions land on whole pixels.
             float s = Scale < 0.999f ? Scale + 0.0002f : Scale;

@@ -23,6 +23,13 @@ namespace WotRUpscaler
             new Mode("Ultra Performance", 0.3333f),
         };
 
+        // The label shown in the menus. Full resolution is named after what the selected upscaler does there: DLAA, TAA, or nothing at all.
+        public static string ModeLabel(Mode m, Settings s)
+        {
+            if (m.Scale < 0.999f) return m.Label;
+            return s.dlss ? "Native (DLAA)" : s.taa ? "Native (TAA)" : "Native";
+        }
+
         // Index of the mode whose scale matches, or -1 for a custom scale.
         public static int ModeIndex(float scale)
         {
@@ -41,10 +48,10 @@ namespace WotRUpscaler
         public static readonly Preset[] DlssPresets =
         {
             new Preset(0, "Automatic", "Automatic: NVIDIA chooses the preset per quality mode, and may change it with driver updates."),
-            new Preset(11, "K (recommended)", "K: the best image quality and the recommended choice. Lighter on the GPU than L and M."),
+            new Preset(11, "K", "K: the best balance of image quality and speed, and the recommended choice from Quality mode up. Lighter on the GPU than L and M."),
             new Preset(10, "J", "J: like K, with slightly less ghosting at the cost of a little more flicker."),
             new Preset(12, "L", "L: NVIDIA's default for Ultra Performance mode. Heavier on the GPU than K."),
-            new Preset(13, "M", "M: NVIDIA's default for Performance mode. Heavier on the GPU than K."),
+            new Preset(13, "M", "M: NVIDIA's default for Performance mode. Heavier on the GPU than K, but the better image can be worth it at Performance and lower."),
         };
 
         // Index in DlssPresets, or -1 when the number is not in the table.

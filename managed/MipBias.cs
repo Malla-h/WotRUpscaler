@@ -14,7 +14,7 @@ namespace WotRUpscaler
 
         static float Target()
         {
-            if (!Scaler.Active || !Dlss.Ready || !Main.S.dlss || (!Main.S.mipAuto && Main.S.mipStrength <= 0f)) return 0f;
+            if (!Scaler.Active || !Upscalers.TemporalReady(Main.S) || (!Main.S.mipAuto && Main.S.mipStrength <= 0f)) return 0f;
             return (Mathf.Log(Scaler.Scale, 2f) - 1f) * (Main.S.mipAuto ? 1f : Main.S.mipStrength);
         }
 

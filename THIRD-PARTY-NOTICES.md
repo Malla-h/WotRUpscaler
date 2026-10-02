@@ -20,6 +20,24 @@ That software is copyright NVIDIA Corporation and is provided under the **NVIDIA
 The source code of WotR Upscaler is released under the MIT License (see `LICENSE`); that license does not apply to the NVIDIA software above. If you want a
 different DLSS runtime version, NVIDIA publishes them in its DLSS SDK repository (https://github.com/NVIDIA/DLSS).
 
+## Playdead: Temporal Reprojection Anti-Aliasing in INSIDE (TAA)
+The TAA upscaler's resolve shader (`WotRTaa.shader`, inside the shader bundle `wotrupscaler`) is based on Playdead's temporal reprojection code
+(https://github.com/playdeadgames/temporal): clipping the history to the colour neighbourhood in YCoCg space, the closest-fragment motion vector, and the
+luminance based feedback weight. It has been changed for this mod (upscaling, HDR colour handling). The original is under the MIT License:
+
+> Copyright (c) 2015 Playdead
+>
+> Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal
+> in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+> copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+>
+> The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+>
+> THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+> FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+> LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+> SOFTWARE.
+
 ## Harmony and Unity Mod Manager
 Runtime patching uses [Harmony](https://github.com/pardeike/Harmony) (MIT License) and the mod is loaded by Unity Mod Manager. Both come with the game's mod
 setup and are not redistributed here.

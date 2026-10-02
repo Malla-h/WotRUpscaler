@@ -109,10 +109,10 @@ namespace WotRUpscaler
                 .OnValueChanged(v => Changed("upscaler", v)));
 
             var modes = new List<LocalizedString>();
-            for (int i = 0; i < Presets.Modes.Length; i++) modes.Add(Str("wotrupscaler.mode." + i, Presets.Modes[i].Label));
+            for (int i = 0; i < Presets.Modes.Length; i++) modes.Add(Str("wotrupscaler.mode." + i, Presets.Modes[i].Scale >= 0.999f ? "Native" : Presets.Modes[i].Label));
             modes.Add(Str("wotrupscaler.mode.custom", "Custom (use the slider)"));
             b.AddDropdownList(DropdownList.New("wotrupscaler.mode", Presets.ModeIndex(0.6667f), Str("wotrupscaler.mode", "Quality mode"), modes)
-                .WithLongDescription(Str("wotrupscaler.mode.long", "How far below the screen resolution the 3D scene is rendered. Lower is faster, higher is sharper. Native (DLAA) renders at full resolution and uses the upscaler only for anti-aliasing."))
+                .WithLongDescription(Str("wotrupscaler.mode.long", "How far below the screen resolution the 3D scene is rendered. Lower is faster, higher is sharper. Native renders at full resolution and uses the upscaler only for anti-aliasing (DLAA with DLSS, TAA with TAA)."))
                 .OnValueChanged(v => Changed("mode", v)));
 
             b.AddSliderFloat(SliderFloat.New("wotrupscaler.scale", 0.6667f, Str("wotrupscaler.scale", "Render scale"), 0.33f, 1f)
@@ -133,18 +133,21 @@ namespace WotRUpscaler
             b.AddDropdownList(DropdownList.New("wotrupscaler.preset", Presets.DlssIndex(Presets.Recommended), Str("wotrupscaler.preset", "DLSS preset"), presets)
                 .WithLongDescription(Str("wotrupscaler.preset.long", tip.ToString()))
                 .OnValueChanged(v => Changed("preset", v)));
-            b.AddToggle(Toggle.New("wotrupscaler.hdr", true, Str("wotrupscaler.hdr", "Run DLSS before post-processing (HDR input)"))
-                .WithLongDescription(Str("wotrupscaler.hdr.long", "Gives DLSS the unprocessed scene, so bloom, depth of field and colour grading work at full resolution. Costs a little performance. Off: DLSS runs on the finished image."))
+            b.AddToggle(Toggle.New("wotrupscaler.hdr", true, Str("wotrupscaler.hdr", "Upscale before post-processing (HDR input)"))
+                .WithLongDescription(Str("wotrupscaler.hdr.long", "Gives the upscaler the unprocessed scene, so bloom, depth of field and colour grading work at full resolution. Costs a little performance. Off: the upscaler runs on the finished image."))
                 .OnValueChanged(v => Changed("hdr", v)));
 
             b.AddSubHeader(Str("wotrupscaler.advanced", "More options"), false);
-            b.AddToggle(Toggle.New("wotrupscaler.smaa", true, Str("wotrupscaler.smaa", "Switch off the game's SMAA and FXAA while an AI upscaler is on"))
-                .WithLongDescription(Str("wotrupscaler.smaa.long", "The upscaler does its own anti-aliasing; the game's SMAA or FXAA would only soften the image it receives."))
+            b.AddToggle(Toggle.New("wotrupscaler.smaa", true, Str("wotrupscaler.smaa", "Switch off the game's SMAA and FXAA while an upscaler is on"))
+                .WithLongDescription(Str("wotrupscaler.smaa.long", "DLSS and TAA do their own anti-aliasing; the game's SMAA or FXAA would only soften the image they receive."))
                 .OnValueChanged(v => Changed("smaa", v)));
             b.AddToggle(Toggle.New("wotrupscaler.mip", true, Str("wotrupscaler.mip", "Automatic mip map bias"))
                 .WithLongDescription(Str("wotrupscaler.mip.long", "Adjusts the texture mip map bias to the render scale, as upscalers expect, so textures stay sharp at lower render resolutions."))
                 .OnValueChanged(v => Changed("mip", v)));
             b.AddDefaultButton();
+            // ModMenu words this button from the group title ("... settings in Upscaling ..."); its string key is built from the group name.
+            Str("mod-menu.default-description.wotrupscaler", "Restore default settings");
+            Str("mod-menu.default-description-long.wotrupscaler", "Sets every WotR Upscaler setting on this page to its default value. Your current settings will be lost.");
             global::ModMenu.ModMenu.AddSettings(b);
         }
 

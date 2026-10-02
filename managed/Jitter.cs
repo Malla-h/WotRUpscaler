@@ -64,7 +64,7 @@ namespace WotRUpscaler
             // Unity only records previous-frame object transforms and skinned positions for cameras that ask for motion vectors. Needed for
             // the character motion vectors and for the character silhouettes the ground markers are clipped against (also without DLSS).
             cam.depthTextureMode |= DepthTextureMode.MotionVectors;
-            if (!Main.S.dlss) return;
+            if (!Upscalers.Temporal(Main.S)) return;
 
             // Unity only records previous-frame object transforms and skinned positions for cameras that ask for motion vectors.
             // Without this, every renderer reports "camera motion only" to the per-object motion vector shader.
@@ -95,9 +95,9 @@ namespace WotRUpscaler
             applied = true;
 
             // The game's SMAA or FXAA (whichever the camera uses: both are values of the same antialiasing mode) would run on the image around
-            // DLSS and soften what DLSS gets to work with.
+            // the upscaler and soften what it gets to work with.
             aaData = null;
-            if (Main.S.disableGameAA && Dlss.Ready)
+            if (Main.S.disableGameAA && Upscalers.TemporalReady(Main.S))
             {
                 aaData = cam.GetComponent<OwlcatAdditionalCameraData>();
                 if (aaData != null) { aaOrig = aaData.Antialiasing; aaData.Antialiasing = AntialiasingMode.None; }

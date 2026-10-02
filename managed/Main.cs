@@ -12,7 +12,9 @@ namespace WotRUpscaler
     {
         public bool enabled = true;
         public float renderScale = 0.6667f;   // multiplier of the output resolution
-        public bool dlss = true;              // false: plain upscale (test mode)
+        public bool dlss = true;              // NVIDIA DLSS is the upscaler (false and taa false: plain upscale, the test mode)
+        public bool taa = false;              // the mod's own TAA is the upscaler (used when dlss is off)
+        public float taaSharpness = 0.15f;    // how much the TAA result is sharpened
         public int preset = 11;
         public int customPreset = 0;          // a preset number outside the named list, kept for the in-game menu's "Other" choice               // NGX render preset: 10=J 11=K 12=L 13=M, 0=default
         public bool dlssBeforePost = true;    // run DLSS on the HDR scene colour before post-processing (false: on the finished image)
@@ -54,6 +56,7 @@ namespace WotRUpscaler
                 S.debugFullMarkerBuffers = S.debugCharMv = S.debugStats = false;
                 S.characterMotion = true;
                 S.holdTolerance = 0.004f;
+                S.taaSharpness = 0.15f;
             }
             entry.OnGUI = OnGUI;
             entry.OnSaveGUI = e => S.Save(e);
@@ -83,6 +86,14 @@ namespace WotRUpscaler
                 GUI.contentColor = old;
                 if (GUILayout.Button("Retry DLSS", GUILayout.Width(120))) Dlss.Retry();
             }
+            if (Taa.Failed)
+            {
+                var old = GUI.contentColor;
+                GUI.contentColor = new Color(1f, 0.45f, 0.3f);
+                GUILayout.Label("TAA cannot run: " + Taa.LastFailure + ". The game renders normally. Choose another upscaler.");
+                GUI.contentColor = old;
+                if (GUILayout.Button("Retry TAA", GUILayout.Width(120))) Taa.Retry();
+            }
             S.enabled = GUILayout.Toggle(S.enabled, "Scale 3D rendering");
             int ow = Screen.width, oh = Screen.height;
             int rw = Mathf.Max(1, (int)(ow * S.renderScale)), rh = Mathf.Max(1, (int)(oh * S.renderScale));
@@ -92,7 +103,7 @@ namespace WotRUpscaler
             foreach (var p in Presets.Modes)
             {
                 bool on = Mathf.Abs(S.renderScale - p.Scale) < 0.005f;
-                if (GUILayout.Toggle(on, p.Label, GUI.skin.button) && !on) S.renderScale = p.Scale;
+                if (GUILayout.Toggle(on, Presets.ModeLabel(p, S), GUI.skin.button) && !on) S.renderScale = p.Scale;
             }
             GUILayout.EndHorizontal();
 
@@ -105,6 +116,14 @@ namespace WotRUpscaler
             }
             GUILayout.EndHorizontal();
             GUILayout.Label(Upscalers.All[Upscalers.Index(S)].Info);
+            if (Upscalers.IsTaa(S) && S.debug)
+            {
+                GUILayout.BeginHorizontal();
+                GUILayout.Label("TAA sharpening: " + S.taaSharpness.ToString("F2"), GUILayout.Width(200));
+                S.taaSharpness = Mathf.Round(GUILayout.HorizontalSlider(S.taaSharpness, 0f, 0.6f, GUILayout.Width(200)) * 100f) / 100f;
+                GUILayout.EndHorizontal();
+                GUILayout.Label(Taa.Describe());
+            }
             if (S.dlss)
             {
                 GUILayout.Label(Dlss.Describe());
@@ -121,11 +140,11 @@ namespace WotRUpscaler
             S.showAdvanced = GUILayout.Toggle(S.showAdvanced, "Advanced options");
             if (S.showAdvanced)
             {
-                S.disableGameAA = GUILayout.Toggle(S.disableGameAA, "Switch off the game's SMAA and FXAA while an AI upscaler is on");
+                S.disableGameAA = GUILayout.Toggle(S.disableGameAA, "Switch off the game's SMAA and FXAA while an upscaler is on");
                 S.mipAuto = GUILayout.Toggle(S.mipAuto, "Texture mip bias: auto (log2(scale) - 1, follows the render scale)");
                 GUILayout.Label("Applied mip bias: " + MipBias.Current.ToString("F2") + (S.mipAuto ? "" : "   manual strength " + S.mipStrength.ToString("F2") + " of the recommended"));
                 if (!S.mipAuto) S.mipStrength = GUILayout.HorizontalSlider(S.mipStrength, 0f, 1.5f);
-                S.dlssBeforePost = GUILayout.Toggle(S.dlssBeforePost, "Run DLSS before post-processing, HDR input (better quality, costs some performance). Off: on the finished image");
+                S.dlssBeforePost = GUILayout.Toggle(S.dlssBeforePost, "Upscale before post-processing, HDR input (better quality, costs some performance). Off: on the finished image");
                 GUILayout.BeginHorizontal();
                 GUILayout.Label("Other DLSS preset number (for presets newer than the list above): ", GUILayout.Width(480));
                 if (customPresetText == null) customPresetText = S.preset.ToString();

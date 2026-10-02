@@ -1,13 +1,15 @@
 # WotR Upscaler
 
 Renders the 3D scene of Pathfinder: Wrath of the Righteous at a lower resolution and upscales it, so the game runs faster at the same sharpness, or
-looks better at the same speed. The interface, the selection circle and the click marker stay at your full screen resolution. Today the upscaler is
-NVIDIA DLSS (including DLAA, which uses DLSS only as anti-aliasing at full resolution). A plain "Simple scaling" mode works on any graphics card.
-FSR and XeSS are not built in; see "FSR and XeSS" below for what works today through a separate tool.
+looks better at the same speed. The interface, the selection circle and the click marker stay at your full screen resolution. There are three upscalers:
+NVIDIA DLSS (including DLAA, which uses DLSS only as anti-aliasing at full resolution), the mod's own TAA (temporal anti-aliasing and upscaling, any
+graphics card), and a plain "Simple scaling" mode (any graphics card). FSR and XeSS are not built in; see "FSR and XeSS" below for what works today
+through a separate tool.
 
 ## Requirements
 - Pathfinder: Wrath of the Righteous on Windows, Direct3D 11 (the game's default). Tested with Unity 2020.3.48f1 on one machine (Windows 10, RTX 5060).
 - [Unity Mod Manager](https://www.nexusmods.com/site/mods/21) (UMM) set up for the game, version 0.21.3 or newer. The mod uses Harmony patches that come with it.
+- For TAA and Simple scaling: any graphics card that runs the game. They need no NVIDIA files.
 - For DLSS: an NVIDIA RTX graphics card with a recent driver. NVIDIA's runtime, `nvngx_dlss.dll`, is **in the release download** (see Credits and licenses).
   The source repository does not contain it.
 - Optional: the **ModMenu** mod, which adds a Mods page to the game's own settings. The mod's options then also appear there. Without it, the Ctrl+F10
@@ -20,7 +22,7 @@ FSR and XeSS are not built in; see "FSR and XeSS" below for what works today thr
 3. Start the game. Open the Unity Mod Manager panel with **Ctrl+F10**. The mod shows "DLSS is running" once DLSS works, in the game's 3D view (not in menus).
 
 **If DLSS cannot start** (no RTX card, or `nvngx_dlss.dll` is missing because an antivirus removed it), the game keeps its normal renderer, so nothing looks
-worse, and the panel says why. Re-extract the mod, then press **Retry DLSS** in the panel's Advanced options. Otherwise check `WotRUpscaler.log` and
+worse, and the panel says why. Choose TAA or Simple scaling instead, or re-extract the mod and press **Retry DLSS** in the panel's Advanced options. Otherwise check `WotRUpscaler.log` and
 `WotRUpscaler.native.log` in the mod folder; an issue report with those two files is the most useful thing you can send.
 
 ## Use
@@ -28,14 +30,15 @@ Open the panel with Ctrl+F10 (and, if ModMenu is installed, the game's Settings,
 stay in step. Nothing is bound to a hotkey by this mod.
 
 - **Scale 3D rendering**: the master switch. Off means the game renders as usual.
-- **Upscaler**: NVIDIA DLSS, or Simple scaling (the scene is rendered smaller and just stretched; no AI, any graphics card).
-- **Quality mode**: Native (DLAA), Ultra Quality (0.77x), Quality (0.67x), Balanced (0.58x), Performance (0.5x), Ultra Performance (0.33x), or Custom with the
+- **Upscaler**: NVIDIA DLSS; TAA (temporal anti-aliasing and upscaling built into this mod: works on any graphics card, but is not as sharp or as stable as
+  DLSS, especially at the lower quality modes); or Simple scaling (the scene is rendered smaller and just stretched with bilinear filtering, any graphics card).
+- **Quality mode**: Native (named Native (DLAA) or Native (TAA) after the upscaler; at full resolution the upscaler only does anti-aliasing), Ultra Quality (0.77x), Quality (0.67x), Balanced (0.58x), Performance (0.5x), Ultra Performance (0.33x), or Custom with the
   **Render scale** slider. The number is the multiplier of your screen resolution that the 3D scene is rendered at. The panel shows the resulting internal resolution.
-- **DLSS preset**: Automatic (NVIDIA decides per mode), K (recommended), J, L, M. K is the best choice for image quality and is the lightest of the newer
-  models. L and M cost two to three times as much GPU time. The panel also takes any other preset number, for presets NVIDIA adds later.
-- **Run DLSS before post-processing (HDR input)**: gives DLSS the unprocessed scene, so bloom, depth of field and colour grading work at full resolution.
-  Costs a little performance. Off runs DLSS on the finished image.
-- **Switch off the game's SMAA and FXAA while an AI upscaler is on**: the upscaler does its own anti-aliasing, and the game's would only soften what it receives.
+- **DLSS preset**: Automatic (NVIDIA decides per mode), K, J, L, M. K is the best balance of image quality and speed and the recommended choice from Quality
+  mode up. L and M cost two to three times as much GPU time; M can be worth it at Performance and lower, where it gives a better image. The panel also takes any other preset number, for presets NVIDIA adds later.
+- **Upscale before post-processing (HDR input)**: gives the upscaler the unprocessed scene, so bloom, depth of field and colour grading work at full resolution.
+  Costs a little performance. Off runs it on the finished image.
+- **Switch off the game's SMAA and FXAA while an upscaler is on**: DLSS and TAA do their own anti-aliasing, and the game's would only soften what they receive.
 - **Automatic mip map bias**: adjusts the texture mip map bias to the render scale, as upscalers expect, so textures stay sharp at lower resolutions.
 
 Settings are stored in `Settings.xml` in the mod folder. Delete it to reset. The panel's Advanced options also hold the marker gap setting and a few
@@ -69,7 +72,7 @@ license (GPL-3.0); it is not included here and this mod is not affiliated with i
 
 ## How it works (short)
 The game's render scale is lowered for the 3D camera and a small jitter is added to its projection each frame. Harmony patches hand the low-resolution colour,
-depth and motion vectors to NVIDIA's DLSS (through a small native plugin) and give the rest of the pipeline a full-resolution result, so post-processing, the
+depth and motion vectors to the chosen upscaler (NVIDIA's DLSS through a small native plugin, or the mod's own TAA shader) and give the rest of the pipeline a full-resolution result, so post-processing, the
 interface and the UI camera work at output resolution. Camera motion vectors are computed from depth. A shader (in an asset bundle) draws exact per-vertex
 motion for characters and for the physics-animated plants and cloth. The ground markers (selection circle, click marker) are rebuilt around themselves at full
 resolution so they stay sharp and stable.
@@ -94,5 +97,7 @@ resolution so they stay sharp and stable.
 - This source repository contains no NVIDIA files. The release download includes two NVIDIA-licensed files: `nvngx_dlss.dll` (NVIDIA's DLSS runtime) and
   `WotRUpscalerNative.dll` (which contains statically linked NVIDIA NGX code). They are provided under the NVIDIA RTX SDKs License; the license text and a
   notice come with the download (`licenses` and [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)).
+- The TAA resolve is based on Playdead's [Temporal Reprojection Anti-Aliasing in INSIDE](https://github.com/playdeadgames/temporal) (MIT License,
+  Copyright (c) 2015 Playdead). Thank you to Playdead and Lasse Jon Fuglsang Pedersen. The license text is in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
 - [Harmony](https://github.com/pardeike/Harmony) and Unity Mod Manager do the runtime patching and loading. Neither is included here.
 - Pathfinder: Wrath of the Righteous is a game by Owlcat Games, based on Pathfinder by Paizo Inc. This is an unofficial fan modification and no game files are included.

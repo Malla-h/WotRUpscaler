@@ -94,30 +94,27 @@ namespace WotRUpscaler
                 case St.Ready: return "DLSS is running.";
                 case St.Failed:
                     return "DLSS is NOT available: " + (LastFailure.Length > 0 ? LastFailure : "unknown reason") + ". While DLSS is selected the game renders normally. "
-                        + "DLSS needs an NVIDIA RTX graphics card and nvngx_dlss.dll in the mod folder. Fix that, then press Retry DLSS in the Mod Manager panel (Ctrl+F10).";
-                default: return Main.S != null && Main.S.dlss ? "DLSS is starting (it starts once a scene with the 3D view is shown)." : "DLSS is not in use (Simple scaling is selected).";
+                        + "DLSS needs an NVIDIA RTX graphics card and nvngx_dlss.dll in the mod folder. Choose TAA or Simple scaling instead, or fix that and press Retry DLSS in the Mod Manager panel (Ctrl+F10).";
+                default: return Main.S != null && Main.S.dlss ? "DLSS is starting (it starts once a scene with the 3D view is shown)." : "DLSS is not in use (" + Upscalers.Name(Main.S) + " is selected).";
             }
         }
 
-        public static void Retry() { if (state == St.Failed) { state = St.Off; LastFailure = ""; } }
+        public static void Retry() { if (state == St.Failed) { state = St.Off; LastFailure = ""; nativeFailed = false; } }
 
+        // The native plugin (motion vectors, buffer copies and timing for every upscaler; the DLSS bridge when NVIDIA's runtime is there).
+        // Returns an empty string when it is loaded, otherwise the reason.
+        static string nativeError = "";
         static bool Load()
         {
-            if (!File.Exists(Path.Combine(Main.Dir, "nvngx_dlss.dll")))
-            {
-                LastFailure = "nvngx_dlss.dll is missing from the WotRUpscaler mod folder";
-                Main.Log(LastFailure);
-                return false;
-            }
             try
             {
                 var path = Path.Combine(Main.Dir, "WotRUpscalerNative.dll");
-                if (LoadLibraryW(path) == IntPtr.Zero) { LastFailure = "LoadLibrary failed err=" + Marshal.GetLastWin32Error(); Main.Log(LastFailure + " " + path); return false; }
+                if (LoadLibraryW(path) == IntPtr.Zero) { nativeError = LastFailure = "WotRUpscalerNative.dll could not be loaded (error " + Marshal.GetLastWin32Error() + ")"; Main.Log(LastFailure + " " + path); return false; }
                 WotRUpscaler_SetLogPath(Path.Combine(Main.Dir, "WotRUpscaler.native.log"));
                 int sc = WotRUpscaler_StructSizes(0), se = WotRUpscaler_StructSizes(1), sm = WotRUpscaler_StructSizes(2), sp = WotRUpscaler_StructSizes(3);
                 if (sc != CreateSize || se != EvalSize || sm != MvSize || sp != CompSize)
                 {
-                    LastFailure = "struct size mismatch native " + sc + "/" + se + "/" + sm + " managed " + CreateSize + "/" + EvalSize + "/" + MvSize;
+                    nativeError = LastFailure = "struct size mismatch native " + sc + "/" + se + "/" + sm + " managed " + CreateSize + "/" + EvalSize + "/" + MvSize;
                     Main.Log(LastFailure);
                     return false;
                 }
@@ -132,16 +129,21 @@ namespace WotRUpscaler
                 Main.Log("native plugin loaded");
                 return true;
             }
-            catch (Exception e) { LastFailure = "load exception " + e.Message; Main.Log("native load exception: " + e); return false; }
+            catch (Exception e) { nativeError = LastFailure = "load exception " + e.Message; Main.Log("native load exception: " + e); return false; }
         }
 
         static void Issue(CommandBuffer c, int id, IntPtr data) { c.IssuePluginEventAndData(eventFn, id, data); }
 
-        // Debug: native plugin without DLSS (for GPU probes in any mode).
+        // The native plugin without DLSS (TAA, GPU probes in any mode). nativeFailed stops repeated attempts.
+        static bool nativeFailed;
+        public static string NativeError { get { return nativeError; } }
         public static bool EnsureLoaded()
         {
             if (loaded) return true;
-            return Load();
+            if (nativeFailed) return false;
+            if (Load()) return true;
+            nativeFailed = true;
+            return false;
         }
 
         // Debug: pipeline statistics and D3D11 state of everything drawn between these two events (logged in the native log).
@@ -202,7 +204,14 @@ namespace WotRUpscaler
         public static bool Tick(int rw, int rh, int outW, int outH, RenderTexture anyTexture)
         {
             if (state == St.Failed) return false;
-            if (!loaded && !Load()) { state = St.Failed; return false; }
+            if (!File.Exists(Path.Combine(Main.Dir, "nvngx_dlss.dll")))
+            {
+                LastFailure = "nvngx_dlss.dll is missing from the WotRUpscaler mod folder";
+                Main.Log(LastFailure);
+                state = St.Failed;
+                return false;
+            }
+            if (!EnsureLoaded()) { LastFailure = nativeError; state = St.Failed; return false; }
             if (Main.S.debugStats != statsOn) { statsOn = Main.S.debugStats; try { WotRUpscaler_SetDebugStats(statsOn ? 1 : 0); } catch { } }
             int q = QualityFor((float)rw / outW), preset = Main.S.preset, hdr = Main.S.dlssBeforePost ? 1 : 0;
 
