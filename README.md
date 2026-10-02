@@ -34,11 +34,14 @@ stay in step. Nothing is bound to a hotkey by this mod.
   DLSS, especially at the lower quality modes); or Simple scaling (the scene is rendered smaller and just stretched with bilinear filtering, any graphics card).
 - **Quality mode**: Native (named Native (DLAA) or Native (TAA) after the upscaler; at full resolution the upscaler only does anti-aliasing), Ultra Quality (0.77x), Quality (0.67x), Balanced (0.58x), Performance (0.5x), Ultra Performance (0.33x), or Custom with the
   **Render scale** slider. The number is the multiplier of your screen resolution that the 3D scene is rendered at. The panel shows the resulting internal resolution.
-- **DLSS preset**: Automatic (NVIDIA decides per mode), K, J, L, M. K is the best balance of image quality and speed and the recommended choice from Quality
+- **DLSS preset**: Automatic (NVIDIA decides per mode; the default), K, J, L, M. K is the best balance of image quality and speed and the recommended choice from Quality
   mode up. L and M cost two to three times as much GPU time; M can be worth it at Performance and lower, where it gives a better image. The panel also takes any other preset number, for presets NVIDIA adds later.
 - **Upscale before post-processing (HDR input)**: gives the upscaler the unprocessed scene, so bloom, depth of field and colour grading work at full resolution.
   Costs a little performance. Off runs it on the finished image.
 - **Switch off the game's SMAA and FXAA while an upscaler is on**: DLSS and TAA do their own anti-aliasing, and the game's would only soften what they receive.
+- **Character preview size** (the characters shown in the inventory, the character sheet and character creation): Original (the game's small texture, anti-aliased by the
+  upscaler), Follow the upscaler (the default: the quality mode applies to the previews as to the 3D scene) or Size on screen (as many pixels as the preview covers;
+  the sharpest and the heaviest). The previews always use the Automatic DLSS preset.
 - **Automatic mip map bias**: adjusts the texture mip map bias to the render scale, as upscalers expect, so textures stay sharp at lower resolutions.
 
 Settings are stored in `Settings.xml` in the mod folder. Delete it to reset. The panel's Advanced options also hold the marker gap setting and a few
@@ -68,7 +71,7 @@ license (GPL-3.0); it is not included here and this mod is not affiliated with i
 - Spell effects and other particles are drawn at the lower resolution like everything else and have no motion vectors, so fast ones can smear.
 - Water, fog and the extra wind flutter some flags have also lack motion vectors.
 - The game's physics animation (cloth, trees, grass) advances in steps, not every frame. That looks slightly choppy and can still ghost a little, with any upscaler.
-- Only the 3D view is scaled. Menus and the interface are untouched.
+- Only the 3D view and the character previews are upscaled. Menus and the interface are untouched.
 
 ## How it works (short)
 The game's render scale is lowered for the 3D camera and a small jitter is added to its projection each frame. Harmony patches hand the low-resolution colour,

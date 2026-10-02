@@ -15,12 +15,13 @@ namespace WotRUpscaler
         public bool dlss = true;              // NVIDIA DLSS is the upscaler (false and taa false: plain upscale, the test mode)
         public bool taa = false;              // the mod's own TAA is the upscaler (used when dlss is off)
         public float taaSharpness = 0.15f;    // how much the TAA result is sharpened
-        public int preset = 11;
+        public int preset = 0;
         public int customPreset = 0;          // a preset number outside the named list, kept for the in-game menu's "Other" choice               // NGX render preset: 10=J 11=K 12=L 13=M, 0=default
         public bool dlssBeforePost = true;    // run DLSS on the HDR scene colour before post-processing (false: on the finished image)
         public bool noJitter = false;
         public float jitSx = -1f, jitSy = -1f;   // jitter sign towards DLSS (verified: displacement of the image = minus the projection jitter)
         public float mvSignX = 1f, mvSignY = 1f; // motion vector scale: the texture holds previous minus current position, which is what DLSS expects
+        public int previewSize = 1;           // character preview (inventory, character creation): 0 the game's original texture size, 1 the size on screen times the quality scale, upscaled (default), 2 the size on screen
         public bool mipAuto = true;           // follow the recommended bias for the current render scale
         public float mipStrength = 1f;        // fraction of the recommended texture LOD bias (log2(scale) - 1)
         public bool disableGameAA = true;     // switch the game's SMAA and FXAA off while DLSS is active
@@ -141,6 +142,15 @@ namespace WotRUpscaler
             if (S.showAdvanced)
             {
                 S.disableGameAA = GUILayout.Toggle(S.disableGameAA, "Switch off the game's SMAA and FXAA while an upscaler is on");
+                GUILayout.Label("Character preview size (inventory, character creation)");
+                GUILayout.BeginHorizontal();
+                for (int i = 0; i < Presets.PreviewSizes.Length; i++)
+                {
+                    bool on = S.previewSize == i;
+                    if (GUILayout.Toggle(on, Presets.PreviewSizes[i].Name, GUI.skin.button) && !on) S.previewSize = i;
+                }
+                GUILayout.EndHorizontal();
+                GUILayout.Label(Presets.PreviewSizes[Mathf.Clamp(S.previewSize, 0, Presets.PreviewSizes.Length - 1)].Info);
                 S.mipAuto = GUILayout.Toggle(S.mipAuto, "Texture mip bias: auto (log2(scale) - 1, follows the render scale)");
                 GUILayout.Label("Applied mip bias: " + MipBias.Current.ToString("F2") + (S.mipAuto ? "" : "   manual strength " + S.mipStrength.ToString("F2") + " of the recommended"));
                 if (!S.mipAuto) S.mipStrength = GUILayout.HorizontalSlider(S.mipStrength, 0f, 1.5f);

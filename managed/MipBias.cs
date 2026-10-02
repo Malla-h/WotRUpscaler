@@ -9,12 +9,17 @@ namespace WotRUpscaler
     public class MipBias : MonoBehaviour
     {
         public static float Current;                       // bias currently applied to textures (0 = none)
+        public static int DollFrame = -1000;               // last frame the character preview camera (inventory, character creation) rendered
+        public static int DollUpscaledFrame = -1000;       // last frame it was rendered and upscaled
         static readonly HashSet<int> done = new HashSet<int>();
         Coroutine scan;
 
         static float Target()
         {
             if (!Scaler.Active || !Upscalers.TemporalReady(Main.S) || (!Main.S.mipAuto && Main.S.mipStrength <= 0f)) return 0f;
+            // The character preview is upscaled like the world, so the same bias suits it. When it is shown without an upscaler the bias is paused
+            // while it renders (the bias is texture-wide; the game's SMAA alone would alias the sharpened textures).
+            if (Time.frameCount - DollFrame < 30 && Time.frameCount - DollUpscaledFrame >= 30) return 0f;
             return (Mathf.Log(Scaler.Scale, 2f) - 1f) * (Main.S.mipAuto ? 1f : Main.S.mipStrength);
         }
 

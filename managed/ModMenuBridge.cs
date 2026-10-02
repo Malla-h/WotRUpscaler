@@ -23,7 +23,7 @@ namespace WotRUpscaler
         static readonly Dictionary<string, string> strings = new Dictionary<string, string>();
         static string lastTitle = "", lastDescription = "";
         const string Description = "Renders the 3D scene at a lower resolution and upscales it with NVIDIA DLSS. The interface stays at full resolution.";
-        const int KeyCount = 8;
+        const int KeyCount = 9;
 
         static LocalizedString Str(string key, string text)
         {
@@ -98,7 +98,7 @@ namespace WotRUpscaler
 
             // One entry per upscaler (see Upscalers). Options that belong to a single upscaler sit in a section of their own below.
             var ups = new List<LocalizedString>();
-            var upTip = new StringBuilder("How the lower-resolution 3D scene is turned back into a sharp image.");
+            var upTip = new StringBuilder("How the lower-resolution 3D scene is turned back into a sharp image. The character previews (inventory, character creation) use the selected upscaler too.");
             for (int i = 0; i < Upscalers.All.Length; i++)
             {
                 ups.Add(Str("wotrupscaler.upscaler." + i, Upscalers.All[i].Name));
@@ -112,7 +112,7 @@ namespace WotRUpscaler
             for (int i = 0; i < Presets.Modes.Length; i++) modes.Add(Str("wotrupscaler.mode." + i, Presets.Modes[i].Scale >= 0.999f ? "Native" : Presets.Modes[i].Label));
             modes.Add(Str("wotrupscaler.mode.custom", "Custom (use the slider)"));
             b.AddDropdownList(DropdownList.New("wotrupscaler.mode", Presets.ModeIndex(0.6667f), Str("wotrupscaler.mode", "Quality mode"), modes)
-                .WithLongDescription(Str("wotrupscaler.mode.long", "How far below the screen resolution the 3D scene is rendered. Lower is faster, higher is sharper. Native renders at full resolution and uses the upscaler only for anti-aliasing (DLAA with DLSS, TAA with TAA)."))
+                .WithLongDescription(Str("wotrupscaler.mode.long", "How far below the screen resolution the 3D scene is rendered. Lower is faster, higher is sharper. Native renders at full resolution and uses the upscaler only for anti-aliasing (DLAA with DLSS, TAA with TAA). The character previews follow this too when their size is set to follow the upscaler (see Character preview size)."))
                 .OnValueChanged(v => Changed("mode", v)));
 
             b.AddSliderFloat(SliderFloat.New("wotrupscaler.scale", 0.6667f, Str("wotrupscaler.scale", "Render scale"), 0.33f, 1f)
@@ -122,7 +122,7 @@ namespace WotRUpscaler
 
             b.AddSubHeader(Str("wotrupscaler.dlss.header", "NVIDIA DLSS"), true);
             var presets = new List<LocalizedString>();
-            var tip = new StringBuilder("Which DLSS model runs.");
+            var tip = new StringBuilder("Which DLSS model runs on the 3D scene. The character previews (inventory, character creation) always use Automatic.");
             for (int i = 0; i < Presets.DlssPresets.Length; i++)
             {
                 presets.Add(Str("wotrupscaler.preset." + i, Presets.DlssPresets[i].Name));
@@ -130,7 +130,7 @@ namespace WotRUpscaler
             }
             presets.Add(Str("wotrupscaler.preset.other", "Other (number set in the Mods panel)"));
             tip.Append("\nOther: a preset number outside this list, typed into the Mods panel (Ctrl+F10), for presets NVIDIA adds later.");
-            b.AddDropdownList(DropdownList.New("wotrupscaler.preset", Presets.DlssIndex(Presets.Recommended), Str("wotrupscaler.preset", "DLSS preset"), presets)
+            b.AddDropdownList(DropdownList.New("wotrupscaler.preset", Presets.DlssIndex(Presets.Default), Str("wotrupscaler.preset", "DLSS preset"), presets)
                 .WithLongDescription(Str("wotrupscaler.preset.long", tip.ToString()))
                 .OnValueChanged(v => Changed("preset", v)));
             b.AddToggle(Toggle.New("wotrupscaler.hdr", true, Str("wotrupscaler.hdr", "Upscale before post-processing (HDR input)"))
@@ -141,6 +141,16 @@ namespace WotRUpscaler
             b.AddToggle(Toggle.New("wotrupscaler.smaa", true, Str("wotrupscaler.smaa", "Switch off the game's SMAA and FXAA while an upscaler is on"))
                 .WithLongDescription(Str("wotrupscaler.smaa.long", "DLSS and TAA do their own anti-aliasing; the game's SMAA or FXAA would only soften the image they receive."))
                 .OnValueChanged(v => Changed("smaa", v)));
+            var previews = new List<LocalizedString>();
+            var previewTip = new StringBuilder("How sharp the character previews (inventory, character creation) are drawn.");
+            for (int i = 0; i < Presets.PreviewSizes.Length; i++)
+            {
+                previews.Add(Str("wotrupscaler.preview." + i, Presets.PreviewSizes[i].Name));
+                previewTip.Append("\n").Append(Presets.PreviewSizes[i].Name).Append(": ").Append(Presets.PreviewSizes[i].Info);
+            }
+            b.AddDropdownList(DropdownList.New("wotrupscaler.preview", 1, Str("wotrupscaler.preview", "Character preview size"), previews)
+                .WithLongDescription(Str("wotrupscaler.preview.long", previewTip.ToString()))
+                .OnValueChanged(v => Changed("preview", v)));
             b.AddToggle(Toggle.New("wotrupscaler.mip", true, Str("wotrupscaler.mip", "Automatic mip map bias"))
                 .WithLongDescription(Str("wotrupscaler.mip.long", "Adjusts the texture mip map bias to the render scale, as upscalers expect, so textures stay sharp at lower render resolutions."))
                 .OnValueChanged(v => Changed("mip", v)));
@@ -182,6 +192,7 @@ namespace WotRUpscaler
                 case "hdr": s.dlssBeforePost = (bool)v; break;
                 case "smaa": s.disableGameAA = (bool)v; break;
                 case "mip": s.mipAuto = (bool)v; break;
+                case "preview": s.previewSize = (int)v; break;
             }
             Scaler.Update();
             try { s.Save(Main.Mod); } catch { }
@@ -207,6 +218,7 @@ namespace WotRUpscaler
                 PushBool("hdr", s.dlssBeforePost);
                 PushBool("smaa", s.disableGameAA);
                 PushBool("mip", s.mipAuto);
+                PushInt("preview", Mathf.Clamp(s.previewSize, 0, Presets.PreviewSizes.Length - 1));
                 synced = shown.Count >= KeyCount;
             }
             catch (Exception e)

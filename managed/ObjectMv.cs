@@ -11,7 +11,9 @@ namespace WotRUpscaler
     // the result goes into a separate target that the native plugin merges into the camera motion vectors.
     public static class ObjectMv
     {
-        public static RenderTexture Target;
+        static RenderTexture worldTarget, previewTarget;
+        // The object motion of the camera being rendered (the character preview has its own, at its own size).
+        public static RenderTexture Target { get { return Scaler.PreviewUpscaled ? previewTarget : worldTarget; } }
         public static string Status = "not started";
         static Material mat;
         static bool initTried, logged;
@@ -38,11 +40,12 @@ namespace WotRUpscaler
         public static bool Prepare(CommandBuffer cb, int rw, int rh, RenderTexture depth)
         {
             if (!Init()) return false;
-            if (Target == null || Target.width != rw || Target.height != rh)
+            ref RenderTexture target = ref (Scaler.PreviewUpscaled ? ref previewTarget : ref worldTarget);
+            if (target == null || target.width != rw || target.height != rh)
             {
-                if (Target != null) Target.Release();
-                Target = new RenderTexture(rw, rh, 0, RenderTextureFormat.ARGBHalf, RenderTextureReadWrite.Linear) { name = "WotRUpscaler ObjMV", filterMode = FilterMode.Point };
-                Target.Create();
+                if (target != null) target.Release();
+                target = new RenderTexture(rw, rh, 0, RenderTextureFormat.ARGBHalf, RenderTextureReadWrite.Linear) { name = "WotRUpscaler ObjMV", filterMode = FilterMode.Point };
+                target.Create();
             }
             cb.SetGlobalMatrix(JitteredVP, Jitter.VPJittered);
             cb.SetGlobalMatrix(NonJitteredVP, Jitter.VPCurrent);
@@ -51,7 +54,7 @@ namespace WotRUpscaler
             cb.SetGlobalFloat(Debug, Main.S.debugCharMv ? 1f : 0f);
             cb.SetGlobalTexture(SceneDepth, depth);
             PbdMotion.Prepare(cb);
-            cb.SetRenderTarget(new RenderTargetIdentifier(Target));
+            cb.SetRenderTarget(new RenderTargetIdentifier(target));
             cb.ClearRenderTarget(false, true, new Color(0f, 0f, 0f, 0f));
             return true;
         }
@@ -125,7 +128,7 @@ namespace WotRUpscaler
             };
             var fs = new FilteringSettings(RenderQueueRange.all, -1) { excludeMotionVectorObjects = false };
             ctx.DrawRenderers(rd.CullResults, ref ds, ref fs);
-            GrassMv.Draw(ctx, mat);
+            if (!Scaler.PreviewUpscaled) GrassMv.Draw(ctx, mat);      // the grass of the world is not part of the character preview
             if (!logged) { logged = true; Main.Log("character motion vector draw issued"); }
         }
     }

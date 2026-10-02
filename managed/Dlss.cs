@@ -13,6 +13,7 @@ namespace WotRUpscaler
         [DllImport("WotRUpscalerNative", CharSet = CharSet.Unicode)] static extern void WotRUpscaler_SetLogPath(string path);
         [DllImport("WotRUpscalerNative")] static extern IntPtr WotRUpscaler_GetEventFunc();
         [DllImport("WotRUpscalerNative")] static extern int WotRUpscaler_GetStatus();
+        [DllImport("WotRUpscalerNative")] static extern int WotRUpscaler_GetStatusSlot(int slot);
         [DllImport("WotRUpscalerNative")] static extern uint WotRUpscaler_GetLastResult();
         [DllImport("WotRUpscalerNative")] static extern int WotRUpscaler_GetEvalCount();
         [DllImport("WotRUpscalerNative")] static extern int WotRUpscaler_StructSizes(int which);
@@ -28,7 +29,7 @@ namespace WotRUpscaler
         struct CreateData
         {
             public IntPtr anyTexture;
-            public int renderW, renderH, outW, outH, quality, flags, preset;
+            public int renderW, renderH, outW, outH, quality, flags, preset, slot;
             [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 260)] public string dir;
         }
 
@@ -40,6 +41,7 @@ namespace WotRUpscaler
             public int reset, renderW, renderH;
             public float sharpness, preExposure;
             public float frameTimeMs;
+            public int slot;
         }
 
         [StructLayout(LayoutKind.Sequential)]
@@ -65,17 +67,22 @@ namespace WotRUpscaler
         const int PresetK = 11;
 
         enum St { Off, Creating, Ready, Failed }
-        static St state = St.Off;
+        // One DLSS feature per camera that is upscaled: slot 0 is the world, slot 1 the character preview (inventory, character creation).
+        class Slot { public St state = St.Off; public int cw, ch, ow, oh, cq, cp, chdr, createFrame, lastEval = -100; }
+        static readonly Slot[] slots = { new Slot(), new Slot() };
+        static St state { get { return slots[0].state; } set { slots[0].state = value; } }   // the world's, which the panel reports
         static bool loaded;
         static IntPtr eventFn, evalRing, createRing, mvRing, compRing, copyRing;
         static int copySlot;
-        static int slot, cw, ch, ow, oh, cq, cp, chdr, createFrame;
+        static int slot;
         static readonly int CreateSize = Marshal.SizeOf(typeof(CreateData)), EvalSize = Marshal.SizeOf(typeof(EvalData)), MvSize = Marshal.SizeOf(typeof(MvData)), CompSize = Marshal.SizeOf(typeof(CompData));
         static CommandBuffer cb;
         static bool statsOn;
 
         public static string LastFailure = "";
-        public static int LastEvalFrame = -100;
+        public static int LastEvalFrame { get { return slots[0].lastEval; } }
+        public static int PreviewEvalFrame { get { return slots[1].lastEval; } }
+        public static bool PreviewReady { get { return slots[1].state == St.Ready; } }
         public static bool Ready { get { return state == St.Ready; } }
         public static bool Failed { get { return state == St.Failed; } }
 
@@ -99,7 +106,7 @@ namespace WotRUpscaler
             }
         }
 
-        public static void Retry() { if (state == St.Failed) { state = St.Off; LastFailure = ""; nativeFailed = false; } }
+        public static void Retry() { if (state == St.Failed) { state = St.Off; LastFailure = ""; nativeFailed = false; } slots[1].state = St.Off; }
 
         // The native plugin (motion vectors, buffer copies and timing for every upscaler; the DLSS bridge when NVIDIA's runtime is there).
         // Returns an empty string when it is loaded, otherwise the reason.
@@ -200,35 +207,44 @@ namespace WotRUpscaler
             return 3;                            // ultra performance
         }
 
-        // Drives load, (re)creation and readiness. Returns true when the feature can be evaluated this frame.
-        public static bool Tick(int rw, int rh, int outW, int outH, RenderTexture anyTexture)
+        // Drives load, (re)creation and readiness of one feature (s: 0 the world, 1 the character preview).
+        // Returns true when the feature can be evaluated this frame.
+        public static bool Tick(int rw, int rh, int outW, int outH, RenderTexture anyTexture, int s = 0)
         {
-            if (state == St.Failed) return false;
-            if (!File.Exists(Path.Combine(Main.Dir, "nvngx_dlss.dll")))
+            var sl = slots[s];
+            if (sl.state == St.Failed) return false;
+            if (s == 0)
             {
-                LastFailure = "nvngx_dlss.dll is missing from the WotRUpscaler mod folder";
-                Main.Log(LastFailure);
-                state = St.Failed;
-                return false;
+                if (!File.Exists(Path.Combine(Main.Dir, "nvngx_dlss.dll")))
+                {
+                    LastFailure = "nvngx_dlss.dll is missing from the WotRUpscaler mod folder";
+                    Main.Log(LastFailure);
+                    sl.state = St.Failed;
+                    return false;
+                }
+                if (!EnsureLoaded()) { LastFailure = nativeError; sl.state = St.Failed; return false; }
             }
-            if (!EnsureLoaded()) { LastFailure = nativeError; state = St.Failed; return false; }
+            else if (!loaded || slots[0].state != St.Ready) return false;      // the preview follows the world's DLSS
             if (Main.S.debugStats != statsOn) { statsOn = Main.S.debugStats; try { WotRUpscaler_SetDebugStats(statsOn ? 1 : 0); } catch { } }
             int q = QualityFor((float)rw / outW), preset = Main.S.preset, hdr = Main.S.dlssBeforePost ? 1 : 0;
+            // The character preview always uses NVIDIA's automatic preset: the heavy presets are chosen for the world, and a large preview should not
+            // cost more than it needs to.
+            if (s == 1) preset = 0;
 
-            if (state == St.Creating)
+            if (sl.state == St.Creating)
             {
-                if (Time.frameCount - createFrame < 3) return false;
-                int s = WotRUpscaler_GetStatus();
-                if (s == 1) { state = St.Ready; Main.Log("DLSS ready"); }
-                else if (s < 0)
+                if (Time.frameCount - sl.createFrame < 3) return false;
+                int st = WotRUpscaler_GetStatusSlot(s);
+                if (st == 1) { sl.state = St.Ready; Main.Log("DLSS" + (s == 1 ? " (character preview)" : "") + " ready"); }
+                else if (st < 0)
                 {
-                    state = St.Failed;
-                    LastFailure = "status " + s + " result 0x" + WotRUpscaler_GetLastResult().ToString("X8");
-                    Main.Log("DLSS failed: " + LastFailure);
+                    sl.state = St.Failed;
+                    if (s == 0) LastFailure = "status " + st + " result 0x" + WotRUpscaler_GetLastResult().ToString("X8");
+                    Main.Log("DLSS" + (s == 1 ? " (character preview)" : "") + " failed: status " + st + " result 0x" + WotRUpscaler_GetLastResult().ToString("X8"));
                 }
                 return false;
             }
-            if (state == St.Ready && cw == rw && ch == rh && ow == outW && oh == outH && cq == q && cp == preset && chdr == hdr) return true;
+            if (sl.state == St.Ready && sl.cw == rw && sl.ch == rh && sl.ow == outW && sl.oh == outH && sl.cq == q && sl.cp == preset && sl.chdr == hdr) return true;
 
             var cd = new CreateData
             {
@@ -237,6 +253,7 @@ namespace WotRUpscaler
                 quality = q,
                 flags = FlagMVLowRes | FlagDepthInverted | (hdr == 1 ? FlagHDR | FlagAutoExposure : 0),
                 preset = preset,
+                slot = s,
                 dir = Main.Dir
             };
             var p = createRing + (slot++ & 3) * CreateSize;
@@ -245,11 +262,11 @@ namespace WotRUpscaler
             Issue(c, 1, p);
             Graphics.ExecuteCommandBuffer(c);
             c.Release();
-            cw = rw; ch = rh; ow = outW; oh = outH; cq = q; cp = preset; chdr = hdr;
-            createFrame = Time.frameCount;
-            state = St.Creating;
-            Jitter.SetPhases(rw, outW);
-            Main.Log("DLSS create issued " + rw + "x" + rh + " -> " + outW + "x" + outH + " quality " + q + " preset " + preset + " hdr " + hdr);
+            sl.cw = rw; sl.ch = rh; sl.ow = outW; sl.oh = outH; sl.cq = q; sl.cp = preset; sl.chdr = hdr;
+            sl.createFrame = Time.frameCount;
+            sl.state = St.Creating;
+            if (s == 0) Jitter.SetPhases(rw, outW);
+            Main.Log("DLSS" + (s == 1 ? " (character preview)" : "") + " create issued " + rw + "x" + rh + " -> " + outW + "x" + outH + " quality " + q + " preset " + preset + " hdr " + hdr);
             return false;
         }
 
@@ -282,7 +299,7 @@ namespace WotRUpscaler
             Issue(c, 5, p);
         }
 
-        public static void QueueEval(CommandBuffer c, RenderTexture color, RenderTexture depth, RenderTexture motion, RenderTexture output, int rw, int rh, bool reset)
+        public static void QueueEval(CommandBuffer c, RenderTexture color, RenderTexture depth, RenderTexture motion, RenderTexture output, int rw, int rh, bool reset, int s = 0)
         {
             var ed = new EvalData
             {
@@ -291,12 +308,13 @@ namespace WotRUpscaler
                 jitterX = Main.S.jitSx * Jitter.JitterPx.x, jitterY = Main.S.jitSy * Jitter.JitterPx.y,
                 mvScaleX = Main.S.mvSignX, mvScaleY = Main.S.mvSignY,
                 reset = reset ? 1 : 0, renderW = rw, renderH = rh,
-                sharpness = 0f, preExposure = 1f, frameTimeMs = Mathf.Clamp(Time.unscaledDeltaTime * 1000f, 1f, 200f)
+                sharpness = 0f, preExposure = 1f, frameTimeMs = Mathf.Clamp(Time.unscaledDeltaTime * 1000f, 1f, 200f),
+                slot = s
             };
             var pe = evalRing + (slot++ & 15) * EvalSize;
             Marshal.StructureToPtr(ed, pe, false);
             Issue(c, 2, pe);
-            LastEvalFrame = Time.frameCount;
+            slots[s].lastEval = Time.frameCount;
         }
     }
 }

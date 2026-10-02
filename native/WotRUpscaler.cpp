@@ -25,6 +25,7 @@ struct CreateData
     int   quality;              // NVSDK_NGX_PerfQuality_Value
     int   flags;                // NVSDK_NGX_DLSS_Feature_Flags
     int   preset;               // NVSDK_NGX_DLSS_Hint_Render_Preset, 0 = default
+    int   slot;                 // which DLSS feature instance (0 = the world, 1 = the character preview)
     wchar_t dir[260];           // folder holding nvngx_dlss.dll, also used as NGX data path
 };
 
@@ -41,6 +42,7 @@ struct EvalData
     float sharpness;
     float preExposure;
     float frameTimeMs;          // frame time in milliseconds, helps DLSS judge how fast things move
+    int   slot;                 // which DLSS feature instance
 };
 
 struct MvData
@@ -64,10 +66,12 @@ struct CompData
 // ---- state ----
 static ID3D11Device*        g_device = nullptr;
 static ID3D11DeviceContext* g_ctx = nullptr;
-static NVSDK_NGX_Parameter* g_params = nullptr;
-static NVSDK_NGX_Handle*    g_feature = nullptr;
+static const int kSlots = 2;
+static NVSDK_NGX_Parameter* g_params = nullptr;          // capability parameters; the world's feature (slot 0) also creates and evaluates with it
+static NVSDK_NGX_Parameter* g_paramsS[kSlots] = {};     // a parameter block of its own for the other features, so that two features never share one
+static NVSDK_NGX_Handle*    g_featureS[kSlots] = {};
+static std::atomic<int>     g_statusS[kSlots];      // 0 idle, 1 ready, <0 failure, per feature instance
 static bool                 g_ngxInit = false;
-static std::atomic<int>     g_status(0);    // 0 idle, 1 ready, <0 failure
 static std::atomic<int>     g_evalCount(0);
 static std::atomic<unsigned> g_lastResult(0);
 static std::atomic<unsigned long long> g_evalUs(0), g_evalTimed(0);   // GPU time spent in DLSS evaluate, from timestamp queries
@@ -101,14 +105,16 @@ static void EnsureDevice(void* resource)
     if (g_device) { g_device->GetImmediateContext(&g_ctx); Log("Got device %p context %p (from a resource)", g_device, g_ctx); }
 }
 
-static void ReleaseFeature()
+static void ReleaseFeature(int slot)
 {
-    if (g_feature) { NVSDK_NGX_D3D11_ReleaseFeature(g_feature); g_feature = nullptr; }
+    if (g_featureS[slot]) { NVSDK_NGX_D3D11_ReleaseFeature(g_featureS[slot]); g_featureS[slot] = nullptr; }
 }
 
 // ---- render-thread work ----
 static void DoCreate(CreateData* d)
 {
+    int slot = (d->slot >= 0 && d->slot < kSlots) ? d->slot : 0;
+    std::atomic<int>& g_status = g_statusS[slot];
     g_status = 0;
     if (!d->anyTexture) { Log("Create: no texture"); g_status = -1; return; }
 
@@ -146,7 +152,13 @@ static void DoCreate(CreateData* d)
         if (!avail) { g_status = -4; return; }
     }
 
-    ReleaseFeature();
+    ReleaseFeature(slot);
+    NVSDK_NGX_Parameter* params = g_params;
+    if (slot != 0)
+    {
+        if (!g_paramsS[slot]) { NVSDK_NGX_Parameter* p = nullptr; if (NVSDK_NGX_SUCCEED(NVSDK_NGX_D3D11_AllocateParameters(&p)) && p) g_paramsS[slot] = p; }
+        if (g_paramsS[slot]) params = g_paramsS[slot];
+    }
 
     NVSDK_NGX_DLSS_Create_Params cp = {};
     cp.Feature.InWidth = d->renderW;
@@ -158,17 +170,17 @@ static void DoCreate(CreateData* d)
 
     // 0 clears the hint so NGX picks its own default for the chosen mode.
     unsigned preset = (unsigned)d->preset;
-    g_params->Set(NVSDK_NGX_Parameter_DLSS_Hint_Render_Preset_DLAA, preset);
-    g_params->Set(NVSDK_NGX_Parameter_DLSS_Hint_Render_Preset_UltraQuality, preset);
-    g_params->Set(NVSDK_NGX_Parameter_DLSS_Hint_Render_Preset_Quality, preset);
-    g_params->Set(NVSDK_NGX_Parameter_DLSS_Hint_Render_Preset_Balanced, preset);
-    g_params->Set(NVSDK_NGX_Parameter_DLSS_Hint_Render_Preset_Performance, preset);
-    g_params->Set(NVSDK_NGX_Parameter_DLSS_Hint_Render_Preset_UltraPerformance, preset);
+    params->Set(NVSDK_NGX_Parameter_DLSS_Hint_Render_Preset_DLAA, preset);
+    params->Set(NVSDK_NGX_Parameter_DLSS_Hint_Render_Preset_UltraQuality, preset);
+    params->Set(NVSDK_NGX_Parameter_DLSS_Hint_Render_Preset_Quality, preset);
+    params->Set(NVSDK_NGX_Parameter_DLSS_Hint_Render_Preset_Balanced, preset);
+    params->Set(NVSDK_NGX_Parameter_DLSS_Hint_Render_Preset_Performance, preset);
+    params->Set(NVSDK_NGX_Parameter_DLSS_Hint_Render_Preset_UltraPerformance, preset);
 
-    NVSDK_NGX_Result r = NGX_D3D11_CREATE_DLSS_EXT(g_ctx, &g_feature, g_params, &cp);
-    Log("Create DLSS %dx%d -> %dx%d quality=%d flags=0x%X preset=%d: 0x%08X", d->renderW, d->renderH, d->outW, d->outH, d->quality, d->flags, d->preset, (unsigned)r);
+    NVSDK_NGX_Result r = NGX_D3D11_CREATE_DLSS_EXT(g_ctx, &g_featureS[slot], params, &cp);
+    Log("Create DLSS[%d] %dx%d -> %dx%d quality=%d flags=0x%X preset=%d: 0x%08X", slot, d->renderW, d->renderH, d->outW, d->outH, d->quality, d->flags, d->preset, (unsigned)r);
     g_lastResult = (unsigned)r;
-    if (NVSDK_NGX_FAILED(r)) { g_feature = nullptr; g_status = -5; return; }
+    if (NVSDK_NGX_FAILED(r)) { g_featureS[slot] = nullptr; g_status = -5; return; }
     g_cw = d->renderW; g_ch = d->renderH; g_ow = d->outW; g_oh = d->outH;
     g_status = 1;
 }
@@ -204,7 +216,10 @@ static void HarvestTimestamps()
 
 static void DoEval(EvalData* e)
 {
-    if (g_status != 1 || !g_feature) return;
+    int slot = (e->slot >= 0 && e->slot < kSlots) ? e->slot : 0;
+    NVSDK_NGX_Handle* feature = g_featureS[slot];
+    NVSDK_NGX_Parameter* params = g_paramsS[slot] ? g_paramsS[slot] : g_params;
+    if (g_statusS[slot] != 1 || !feature) return;
     InitTimestamps();
     TsSet* ts = nullptr;
     if (g_tsReady)
@@ -231,7 +246,7 @@ static void DoEval(EvalData* e)
     ep.InExposureScale = 1.f;
     ep.InFrameTimeDeltaInMsec = e->frameTimeMs;
 
-    NVSDK_NGX_Result r = NGX_D3D11_EVALUATE_DLSS_EXT(g_ctx, g_feature, g_params, &ep);
+    NVSDK_NGX_Result r = NGX_D3D11_EVALUATE_DLSS_EXT(g_ctx, feature, params, &ep);
     if (ts) { g_ctx->End(ts->end); g_ctx->End(ts->disjoint); ts->inflight = true; }
     g_lastResult = (unsigned)r;
     int n = ++g_evalCount;
@@ -701,9 +716,10 @@ static void DoPassEnd(void* extraDepth)
 
 static void DoShutdown()
 {
-    ReleaseFeature();
+    for (int i = 0; i < kSlots; i++) ReleaseFeature(i);
+    for (int i = 0; i < kSlots; i++) if (g_paramsS[i]) { NVSDK_NGX_D3D11_DestroyParameters(g_paramsS[i]); g_paramsS[i] = nullptr; }
     if (g_ngxInit && g_device) { NVSDK_NGX_D3D11_Shutdown1(g_device); g_ngxInit = false; }
-    g_status = 0;
+    for (int i = 0; i < kSlots; i++) g_statusS[i] = 0;
 }
 
 // ---- per-frame section timing (benchmark) ----
@@ -802,14 +818,15 @@ static void __stdcall OnEvent(int eventId, void* data)
     __except (EXCEPTION_EXECUTE_HANDLER)
     {
         Log("Exception 0x%08X in event %d", GetExceptionCode(), eventId);
-        g_status = -99;
+        g_statusS[0] = -99;
     }
 }
 
 // ---- exports ----
 EXPORT void WotRUpscaler_SetLogPath(const wchar_t* path) { wcscpy_s(g_logPath, path); }
 EXPORT void* WotRUpscaler_GetEventFunc() { return reinterpret_cast<void*>(&OnEvent); }
-EXPORT int WotRUpscaler_GetStatus() { return g_status; }
+EXPORT int WotRUpscaler_GetStatus() { return g_statusS[0]; }
+EXPORT int WotRUpscaler_GetStatusSlot(int slot) { return slot >= 0 && slot < kSlots ? (int)g_statusS[slot] : -1; }
 EXPORT unsigned WotRUpscaler_GetLastResult() { return g_lastResult; }
 EXPORT int WotRUpscaler_GetEvalCount() { return g_evalCount; }
 // GPU time of the DLSS evaluate call, accumulated from timestamp queries since the last reset.

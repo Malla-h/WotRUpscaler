@@ -21,12 +21,12 @@ namespace WotRUpscaler
             return Mathf.Abs(1f - s) < 0.05f ? 1f : s;
         }
 
-        public static int Width(Camera c) { return Scaler.IsScaled(c) && !Scaler.PostDlss ? (int)(c.pixelWidth * Snapped()) : c.pixelWidth; }
-        public static int Height(Camera c) { return Scaler.IsScaled(c) && !Scaler.PostDlss ? (int)(c.pixelHeight * Snapped()) : c.pixelHeight; }
+        public static int Width(Camera c) { return Scaler.IsScaledTarget(c) && !Scaler.PostDlss ? (int)(c.pixelWidth * Snapped()) : c.pixelWidth; }
+        public static int Height(Camera c) { return Scaler.IsScaledTarget(c) && !Scaler.PostDlss ? (int)(c.pixelHeight * Snapped()) : c.pixelHeight; }
         public static Rect Rect(Camera c)
         {
             var r = c.pixelRect;
-            if (!Scaler.IsScaled(c) || Scaler.PostDlss) return r;
+            if (!Scaler.IsScaledTarget(c) || Scaler.PostDlss) return r;
             float s = Snapped();
             return new Rect(r.x * s, r.y * s, (int)(r.width * s), (int)(r.height * s));
         }

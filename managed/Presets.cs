@@ -37,6 +37,14 @@ namespace WotRUpscaler
             return -1;
         }
 
+        // How the character previews (inventory, character creation) are drawn, from the lightest to the heaviest on the GPU.
+        public static readonly Preset[] PreviewSizes =
+        {
+            new Preset(0, "Original", "The original small texture the game uses for the previews ( 760X920 ), anti-aliased by the upscaler."),
+            new Preset(1, "Follow the upscaler", "The quality mode applies to the previews as it does to the 3D scene (for example half the size on screen at Performance), then the upscaler brings the image back up."),
+            new Preset(2, "Size on screen", "As many pixels as the preview covers on screen, anti-aliased (DLAA or TAA). The sharpest choice; the quality mode does not apply."),
+        };
+
         public struct Preset
         {
             public int Value; public string Name, Info;
@@ -44,7 +52,7 @@ namespace WotRUpscaler
         }
 
         // NGX render presets (values from NVIDIA's nvsdk_ngx_defs.h), in the order the menus list them.
-        public const int Recommended = 11;
+        public const int Default = 0;     // Automatic
         public static readonly Preset[] DlssPresets =
         {
             new Preset(0, "Automatic", "Automatic: NVIDIA chooses the preset per quality mode, and may change it with driver updates."),

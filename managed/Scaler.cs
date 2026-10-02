@@ -17,6 +17,14 @@ namespace WotRUpscaler
 
         public static bool IsUiCamera(Camera c) { return c.name.StartsWith("UICamera"); }
 
+        // The character preview (inventory, character sheet, character creation): a camera that draws into a texture of its own. It is not scaled, but
+        // it gets the selected temporal upscaler at its own resolution (DLAA with DLSS), see Preview.
+        public static bool PreviewUpscaled;     // the preview camera that is rendering right now is being upscaled
+        public static bool IsPreview(Camera c) { return c != null && c.cameraType == CameraType.Game && c.targetTexture != null && c.name == "DollroomCamera"; }
+        // The cameras whose render targets are smaller than the camera itself (the world camera, and the preview when it is upscaled).
+        public static bool IsScaledTarget(Camera c) { return IsScaled(c) || (Main.S.previewSize == 1 && PreviewActive(c)); }
+        public static bool PreviewActive(Camera c) { return Active && IsPreview(c) && Upscalers.Temporal(Main.S) && Upscalers.TemporalReady(Main.S); }
+
         public static bool IsScaled(Camera c)
         {
             return Active && c != null && c.cameraType == CameraType.Game && c.targetTexture == null && !IsUiCamera(c);
@@ -51,7 +59,7 @@ namespace WotRUpscaler
     {
         static void Prefix(Camera camera, ref float renderScale)
         {
-            if (renderScale < 1f && !Scaler.IsScaled(camera)) renderScale = 1f;
+            if (renderScale < 1f && !Scaler.IsScaledTarget(camera)) renderScale = 1f;
         }
     }
 }

@@ -9,7 +9,9 @@ namespace WotRUpscaler
     public static class Taa
     {
         public static string LastFailure = "";
-        public static int LastFrame = -100;                  // frame of the last resolve (a gap resets the history)
+        static int lastFrame = -100, lastPreviewFrame = -100;
+        public static int LastFrame { get { return lastFrame; } }                    // frame of the last resolve (a gap resets the history)
+        public static int PreviewFrame { get { return lastPreviewFrame; } }
         public static bool Ready { get { return ready; } }
         public static bool Failed { get { return failed; } }
 
@@ -17,8 +19,9 @@ namespace WotRUpscaler
 
         static bool ready, failed, shaderTried;
         static Material mat;
-        static RenderTexture[] hist = new RenderTexture[2];
-        static int cur;                                       // the history that holds the previous result
+        // The world camera and the character preview camera each keep their own history (two textures each: previous result, new result).
+        static RenderTexture[][] histories = { new RenderTexture[2], new RenderTexture[2] };
+        static int[] curs = new int[2];                       // the history that holds the previous result
         static int phaseW, phaseR;
         static readonly int ColorId = Shader.PropertyToID("_WotRTaaColor"), DepthId = Shader.PropertyToID("_WotRTaaDepth"), MotionId = Shader.PropertyToID("_WotRTaaMotion"),
             HistoryId = Shader.PropertyToID("_WotRTaaHistory"), SrcId = Shader.PropertyToID("_WotRTaaSrcSize"), DstId = Shader.PropertyToID("_WotRTaaDstSize"),
@@ -38,13 +41,14 @@ namespace WotRUpscaler
         }
 
         // True when the resolve can run this frame.
-        public static bool Tick(int rw, int rh, int ow, int oh)
+        public static bool Tick(int rw, int rh, int ow, int oh, int ctx = 0)
         {
             if (failed) return false;
+            if (ctx != 0 && !ready) return false;                // the preview follows the world
             if (!Dlss.EnsureLoaded()) { Fail(Dlss.NativeError.Length > 0 ? Dlss.NativeError : "the native plugin did not load"); return false; }   // motion vectors are computed there
             if (!EnsureMaterial()) { Fail("shader missing (" + Bundle.Error + ")"); return false; }
             if (!ready) { ready = true; Main.Log("TAA ready"); }
-            if (rw != phaseR || ow != phaseW) { phaseR = rw; phaseW = ow; Jitter.SetPhases(rw, ow); }
+            if (ctx == 0 && (rw != phaseR || ow != phaseW)) { phaseR = rw; phaseW = ow; Jitter.SetPhases(rw, ow); }
             return true;
         }
 
@@ -81,8 +85,10 @@ namespace WotRUpscaler
         }
 
         // Resolves this frame (render resolution) into 'output' (output resolution) and keeps the result as the next frame's history.
-        public static void Resolve(CommandBuffer c, RenderTexture color, RenderTexture depth, RenderTexture motion, RenderTexture output, int rw, int rh, int ow, int oh, bool reset)
+        public static void Resolve(CommandBuffer c, RenderTexture color, RenderTexture depth, RenderTexture motion, RenderTexture output, int rw, int rh, int ow, int oh, bool reset, int ctx = 0)
         {
+            var hist = histories[ctx];
+            int cur = curs[ctx];
             bool fresh = Ensure(ref hist[0], ow, oh);
             fresh |= Ensure(ref hist[1], ow, oh);
             var read = hist[cur];
@@ -105,8 +111,8 @@ namespace WotRUpscaler
             c.SetRenderTarget(output);
             c.DrawProcedural(Matrix4x4.identity, mat, 1, MeshTopology.Triangles, 3);
 
-            cur ^= 1;
-            LastFrame = Time.frameCount;
+            curs[ctx] = cur ^ 1;
+            if (ctx == 0) lastFrame = Time.frameCount; else lastPreviewFrame = Time.frameCount;
         }
     }
 }

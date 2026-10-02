@@ -464,6 +464,11 @@ namespace WotRUpscaler
         static void Prefix(object __instance, ScriptableRenderContext context, ref RenderingData renderingData)
         {
             var cam = renderingData.CameraData.Camera;
+            if (Scaler.PreviewUpscaled && Scaler.IsPreview(cam))
+            {
+                if (Main.S.dlssBeforePost && !(bool)isFinal.GetValue(__instance)) Preview.Run(context, ref renderingData, true, __instance, descriptor);
+                return;
+            }
             if (!Scaler.IsScaled(cam) || !Upscalers.Temporal(Main.S) || !Main.S.dlssBeforePost || (bool)isFinal.GetValue(__instance)) return;
             Upscale.BeforePost(context, ref renderingData, __instance, descriptor);
         }
@@ -471,6 +476,11 @@ namespace WotRUpscaler
         static void Postfix(object __instance, ScriptableRenderContext context, ref RenderingData renderingData)
         {
             var cam = renderingData.CameraData.Camera;
+            if (Scaler.PreviewUpscaled && Scaler.IsPreview(cam))
+            {
+                if (!Main.S.dlssBeforePost && !(bool)isFinal.GetValue(__instance)) Preview.Run(context, ref renderingData, false, null, null);
+                return;
+            }
             if (!Scaler.IsScaled(cam) || (bool)isFinal.GetValue(__instance)) return;
             if (Scaler.PostDlss) return;            // the HDR path already produced the full-resolution image
             Upscale.AfterPost(context, ref renderingData);
