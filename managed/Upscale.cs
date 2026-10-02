@@ -127,6 +127,7 @@ namespace WotRUpscaler
             {
                 ObjectMv.Draw(ctx, ref rd);
                 Dlss.QueueComposite(cb, ObjectMv.Target, motion, rw, rh);
+                PbdMotion.Snapshot(cb);
             }
             bool reset = Jitter.ResetPending || Time.frameCount - Dlss.LastEvalFrame > 1;
             Jitter.ResetPending = false;

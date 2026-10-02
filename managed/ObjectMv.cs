@@ -50,6 +50,7 @@ namespace WotRUpscaler
             cb.SetGlobalVector(Size, new Vector4(rw, rh, 0f, 0f));
             cb.SetGlobalFloat(Debug, Main.S.debugCharMv ? 1f : 0f);
             cb.SetGlobalTexture(SceneDepth, depth);
+            PbdMotion.Prepare(cb);
             cb.SetRenderTarget(new RenderTargetIdentifier(Target));
             cb.ClearRenderTarget(false, true, new Color(0f, 0f, 0f, 0f));
             return true;

@@ -21,11 +21,24 @@ namespace WotRUpscaler
 
         static readonly Regex WindLike = new Regex("wind|sway|bend|pbd|flex|anim|trunk|leaf|grass|fluid|vertex|noise|time", RegexOptions.IgnoreCase);
 
+        // What a Lit material does with its vertices: vertex animation (wind), position based dynamics (grass, cloth), GPU skinning, baked
+        // vertex animation textures, instanced drawing.
+        static string Signature(Material m)
+        {
+            var sb = new StringBuilder();
+            foreach (var p in new[] { "_VertexAnimationEnabled", "_PbdMode", "_GpuSkinning", "_VatEnabled", "_IndirectIstancing", "_Alphatest" })
+                if (m.HasProperty(p)) sb.Append(p.TrimStart('_')).Append('=').Append(m.GetFloat(p).ToString("0.##")).Append(' ');
+            foreach (var k in m.shaderKeywords)
+                if (k.StartsWith("PBD") || k.StartsWith("VERTEX_ANIM") || k.StartsWith("INDIRECT") || k == "INSTANCING_ON" || k.StartsWith("VAT") || k == "_GPU_SKINNING") sb.Append(k).Append(' ');
+            return sb.ToString().TrimEnd();
+        }
+
         static void Add(Dictionary<string, Entry> map, Material m, string kind, string objName, int layer, int verts)
         {
             if (m == null || m.shader == null) return;
             Entry e;
             string key = m.shader.name;
+            if (key == "Owlcat/Lit") key += " [" + Signature(m) + "]";
             if (!map.TryGetValue(key, out e)) map[key] = e = new Entry { sample = m };
             e.count++; e.verts += verts; e.kinds.Add(kind); e.layers.Add(layer);
             if (e.examples.Count < 4) e.examples.Add(objName);

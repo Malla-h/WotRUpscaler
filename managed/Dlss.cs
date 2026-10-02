@@ -67,7 +67,8 @@ namespace WotRUpscaler
         enum St { Off, Creating, Ready, Failed }
         static St state = St.Off;
         static bool loaded;
-        static IntPtr eventFn, evalRing, createRing, mvRing, compRing;
+        static IntPtr eventFn, evalRing, createRing, mvRing, compRing, copyRing;
+        static int copySlot;
         static int slot, cw, ch, ow, oh, cq, cp, chdr, createFrame;
         static readonly int CreateSize = Marshal.SizeOf(typeof(CreateData)), EvalSize = Marshal.SizeOf(typeof(EvalData)), MvSize = Marshal.SizeOf(typeof(MvData)), CompSize = Marshal.SizeOf(typeof(CompData));
         static CommandBuffer cb;
@@ -110,6 +111,7 @@ namespace WotRUpscaler
                 createRing = Marshal.AllocHGlobal(sc * 4);
                 mvRing = Marshal.AllocHGlobal(sm * 16);
                 compRing = Marshal.AllocHGlobal(sp * 16);
+                copyRing = Marshal.AllocHGlobal(IntPtr.Size * 2 * 16);
                 cb = new CommandBuffer { name = "WotRUpscaler" };
                 loaded = true;
                 Main.Log("native plugin loaded");
@@ -132,6 +134,16 @@ namespace WotRUpscaler
         public static void QueuePassEnd(CommandBuffer c, IntPtr extraDepth) { if (loaded) Issue(c, 8, extraDepth); }
 
         // Benchmark: GPU timestamps (see GpuTimer / the native DoMark) and the totals they produce.
+        // GPU buffer copy on the render thread (both pointers are native buffer pointers of equally sized buffers).
+        public static void QueueCopyBuffer(CommandBuffer c, IntPtr dst, IntPtr src)
+        {
+            if (!loaded || dst == IntPtr.Zero || src == IntPtr.Zero) return;
+            var p = copyRing + (copySlot++ & 15) * IntPtr.Size * 2;
+            Marshal.WriteIntPtr(p, 0, dst);
+            Marshal.WriteIntPtr(p, IntPtr.Size, src);
+            Issue(c, 10, p);
+        }
+
         public static void QueueMark(CommandBuffer c, int slot) { if (loaded) Issue(c, 9, (IntPtr)slot); }
         public static void SetFrameTiming(bool on) { if (loaded) try { WotRUpscaler_SetFrameTiming(on ? 1 : 0); } catch { } }
         public static void ResetFrameTiming() { if (loaded) try { WotRUpscaler_ResetFrameTiming(); } catch { } }

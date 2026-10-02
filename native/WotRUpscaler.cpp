@@ -761,6 +761,14 @@ static void DoMark(void* data)
     if (slot == 7) { g_ctx->End(f.disjoint); f.open = false; f.inflight = true; g_frOpen = -1; }
 }
 
+// Copies one GPU buffer into another of the same size (event 10): last frame's physics bone matrices for the plants' motion vectors.
+struct CopyData { void* dst; void* src; };
+static void DoCopyBuffer(CopyData* d)
+{
+    if (!g_ctx || !d || !d->dst || !d->src) return;
+    g_ctx->CopyResource(Res(d->dst), Res(d->src));
+}
+
 // Unity plugin event with data: eventId 1 = create/recreate, 2 = evaluate, 3 = shutdown, 4 = camera motion vectors from depth, 5 = merge object motion
 static void __stdcall OnEvent(int eventId, void* data)
 {
@@ -776,6 +784,7 @@ static void __stdcall OnEvent(int eventId, void* data)
         case 7: DoPassBegin(data); break;
         case 8: DoPassEnd(data); break;
         case 9: DoMark(data); break;
+        case 10: DoCopyBuffer(reinterpret_cast<CopyData*>(data)); break;
         }
     }
     __except (EXCEPTION_EXECUTE_HANDLER)

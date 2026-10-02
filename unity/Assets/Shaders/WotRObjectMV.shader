@@ -43,7 +43,50 @@ Shader "Hidden/WotRUpscaler/ObjectMotionVectors"
     {
         float3 vertex : POSITION;
         float3 oldPos : TEXCOORD4;
+        float4 blendWeights : BLENDWEIGHTS;     // position based dynamics skinning (trees, bushes, tents), see PbdSkin
+        uint4 blendIndices : BLENDINDICES;
     };
+
+    // The game animates trees, bushes and tent cloth with a GPU physics simulation: every frame it writes one matrix per simulated bone into
+    // a buffer, and the vertex shader skins each vertex with up to four of them. The same skinning is done here twice, with this frame's
+    // buffer (the game's global) and last frame's (a copy the mod keeps), which gives the exact motion of every leaf.
+    struct PbdBone { float4 c0, c1, c2, c3; };      // an affine matrix as four columns (xyz used), 64 bytes
+    StructuredBuffer<PbdBone> _PbdBindposes;
+    StructuredBuffer<PbdBone> _WotRPbdPrevBindposes;
+    StructuredBuffer<int> _PbdSkinnedBodyBoneIndicesMap;
+    float _PbdEnabledLocal, _PbdEnabledGlobal, _WotRPbdPrevValid;
+    int _PbdBonesOffset, _PbdBoneIndicesOffset;
+    float4 _PbdWeightMask;
+
+    // Set by the game per renderer (property block) for skinned bodies: not for the physics cloth or grass modes (no weight mask there).
+    bool PbdSkinned()
+    {
+        return _PbdEnabledLocal > 0.5 && _PbdEnabledGlobal > 0.5 && dot(_PbdWeightMask, float4(1.0, 1.0, 1.0, 1.0)) > 0.5;
+    }
+
+    float3 PbdSkinCurrent(appdata v)
+    {
+        float4 w = v.blendWeights * _PbdWeightMask;
+        float3 acc = float3(0.0, 0.0, 0.0);
+        [unroll] for (int k = 0; k < 4; k++)
+        {
+            PbdBone m = _PbdBindposes[_PbdSkinnedBodyBoneIndicesMap[v.blendIndices[k] + _PbdBoneIndicesOffset] + _PbdBonesOffset];
+            acc += w[k] * (m.c0.xyz * v.vertex.x + m.c1.xyz * v.vertex.y + m.c2.xyz * v.vertex.z + m.c3.xyz);
+        }
+        return acc;
+    }
+
+    float3 PbdSkinPrevious(appdata v)
+    {
+        float4 w = v.blendWeights * _PbdWeightMask;
+        float3 acc = float3(0.0, 0.0, 0.0);
+        [unroll] for (int k = 0; k < 4; k++)
+        {
+            PbdBone m = _WotRPbdPrevBindposes[_PbdSkinnedBodyBoneIndicesMap[v.blendIndices[k] + _PbdBoneIndicesOffset] + _PbdBonesOffset];
+            acc += w[k] * (m.c0.xyz * v.vertex.x + m.c1.xyz * v.vertex.y + m.c2.xyz * v.vertex.z + m.c3.xyz);
+        }
+        return acc;
+    }
 
     // Characters and what they carry: skinned meshes with previous-frame positions (x = 1), and rigid pieces (potions on a belt,
     // weapons, carried props) whose previous transform is valid and differs from the current one. Static scenery has identical
@@ -105,12 +148,19 @@ Shader "Hidden/WotRUpscaler/ObjectMotionVectors"
             v2f vert(appdata v)
             {
                 v2f o;
-                float4 wp = mul(unity_ObjectToWorld, float4(v.vertex, 1.0));
+                bool pbd = PbdSkinned();
+                float3 curPos = v.vertex, prevPos = v.vertex;
+                if (pbd)
+                {
+                    curPos = PbdSkinCurrent(v);
+                    prevPos = _WotRPbdPrevValid > 0.5 ? PbdSkinPrevious(v) : curPos;
+                }
+                float4 wp = mul(unity_ObjectToWorld, float4(curPos, 1.0));
                 o.pos = mul(_WotRJitteredVP, wp);
                 o.cur = mul(_WotRNonJitteredVP, wp);
                 bool skinned;
-                bool draw = IsCharacterPart(skinned);
-                float3 old = skinned ? v.oldPos : v.vertex;
+                bool draw = IsCharacterPart(skinned) || pbd;
+                float3 old = pbd ? prevPos : (skinned ? v.oldPos : v.vertex);
                 // A skinned mesh with an untrustworthy previous transform keeps its skinning motion (old vertex position) only.
                 float4x4 pmat = PrevMatrixSane() ? unity_MatrixPreviousM : unity_ObjectToWorld;
                 o.prev = mul(_WotRPreviousVP, mul(pmat, float4(old, 1.0)));
