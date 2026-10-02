@@ -58,6 +58,41 @@ Shader "Hidden/WotRUpscaler/ObjectMotionVectors"
     int _PbdBonesOffset, _PbdBoneIndicesOffset;
     float4 _PbdWeightMask;
 
+    // Grass: the game draws its instanced detail meshes (grass blades) with DrawMeshInstancedIndirect. Each blade is a pair of simulated
+    // physics particles (rest position and simulated position); the vertex shader bends the blade by how far the upper particle moved,
+    // weighted by the square of the vertex height over the rest length. The same is evaluated here with this frame's particle positions
+    // and with last frame's (a copy the mod keeps).
+    struct GrassInstance { float4 m0, m1, m2, m3, n0, n1, n2, n3, q0, q1, q2; };    // 176 bytes: object to world and world to object columns, ..., particle index at byte 164
+    StructuredBuffer<GrassInstance> _IndirectInstanceDataBuffer;
+    StructuredBuffer<uint> _ArgsBuffer;
+    StructuredBuffer<uint> _IsVisibleBuffer;
+    StructuredBuffer<float3> _PbdParticlesBasePositionBuffer;
+    StructuredBuffer<float3> _PbdParticlesPositionBuffer;
+    StructuredBuffer<float3> _WotRPbdPrevParticles;
+    float _WotRPbdPrevParticlesValid;
+    int _ArgsOffset;
+
+    float3 Affine(float4 c0, float4 c1, float4 c2, float4 c3, float3 p)
+    {
+        return c0.xyz * p.x + c1.xyz * p.y + c2.xyz * p.z + c3.xyz;
+    }
+
+    float3 GrassPosition(GrassInstance g, float3 vtx, bool previous)
+    {
+        float3 pos = vtx;
+        if (_PbdEnabledLocal > 0.5 && _PbdEnabledGlobal > 0.5)
+        {
+            uint pi = asuint(g.q2.y);
+            float3 p0 = Affine(g.n0, g.n1, g.n2, g.n3, _PbdParticlesBasePositionBuffer[pi]);
+            float3 p1 = Affine(g.n0, g.n1, g.n2, g.n3, _PbdParticlesBasePositionBuffer[pi + 1]);
+            float3 sim = previous ? _WotRPbdPrevParticles[pi + 1] : _PbdParticlesPositionBuffer[pi + 1];
+            float3 q1 = Affine(g.n0, g.n1, g.n2, g.n3, sim);
+            float k = vtx.y / length(p0 - p1);
+            pos = vtx + k * k * (q1 - p1);
+        }
+        return pos;
+    }
+
     // Set by the game per renderer (property block) for skinned bodies: not for the physics cloth or grass modes (no weight mask there).
     bool PbdSkinned()
     {
@@ -238,6 +273,56 @@ Shader "Hidden/WotRUpscaler/ObjectMotionVectors"
                           & _WotRStencil.Load(int3(clamp(i0 + int2(0, 1), 0, mx), 0)).g & _WotRStencil.Load(int3(clamp(i0 + int2(1, 1), 0, mx), 0)).g;
                 if (all1 & 1) discard;
                 return float4(0, 0, 0, 0);
+            }
+            ENDHLSL
+        }
+
+        // Pass 2: motion vectors of the instanced physics grass (drawn by the mod with DrawMeshInstancedIndirect, like the game's own pass).
+        Pass
+        {
+            Name "GrassMV"
+            Tags { "LightMode" = "MotionVectors" }
+            Cull Off
+            ZWrite Off
+            ZTest Always
+            Blend Off
+
+            HLSLPROGRAM
+            #pragma target 4.5
+            #pragma vertex vert
+            #pragma fragment frag
+
+            struct gin { float3 vertex : POSITION; uint iid : SV_InstanceID; };
+            struct v2f
+            {
+                float4 pos : SV_POSITION;
+                float4 cur : TEXCOORD0;
+                float4 prev : TEXCOORD1;
+            };
+
+            v2f vert(gin v)
+            {
+                v2f o;
+                uint vis = _IsVisibleBuffer[_ArgsBuffer[_ArgsOffset] + v.iid];
+                GrassInstance g = _IndirectInstanceDataBuffer[vis];
+                float3 curPos = GrassPosition(g, v.vertex, false);
+                float3 prevPos = _WotRPbdPrevParticlesValid > 0.5 ? GrassPosition(g, v.vertex, true) : curPos;
+                float4 wp = float4(Affine(g.m0, g.m1, g.m2, g.m3, curPos), 1.0);
+                float4 wpPrev = float4(Affine(g.m0, g.m1, g.m2, g.m3, prevPos), 1.0);
+                o.pos = mul(_WotRJitteredVP, wp);
+                o.cur = mul(_WotRNonJitteredVP, wp);
+                o.prev = mul(_WotRPreviousVP, wpPrev);
+                return o;
+            }
+
+            float4 frag(v2f i) : SV_Target
+            {
+                float sceneZ = _WotRDepth.Load(int3(i.pos.xy, 0));
+                if (abs(i.pos.z - sceneZ) > max(sceneZ * 0.002, 1e-6)) discard;
+                float2 c = i.cur.xy / i.cur.w;
+                float2 p = i.prev.xy / i.prev.w;
+                float2 mv = (p - c) * 0.5 * float2(_WotRSize.x, -_WotRSize.y);
+                return float4(mv, 0.0, 1.0);
             }
             ENDHLSL
         }

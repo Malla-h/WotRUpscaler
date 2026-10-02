@@ -1,6 +1,7 @@
 """Does vegetation (wind-animated, no motion vectors of its own) reproject worse than static scenery?
 
-Usage: grass_stability.py <capture dir> [region]   region = ur (default), ul, lr, ll: the screen quadrant that holds the plants.
+Usage: grass_stability.py <capture dir> [region] [all]   region = ur (default), ul, lr, ll: the screen quadrant that holds the plants; "all" also
+measures the pixels covered by the object motion pass (needed once plants get their own motion vectors).
 For each pair of consecutive captured frames the DLSS input colour of frame k-1 is reprojected onto frame k with the captured motion
 vectors (and the jitter difference). The error, normalised by local detail, is compared between the plant region and the rest of the
 scenery. A block search then estimates how far the plants really moved between the frames beyond what the motion vectors say.
@@ -19,6 +20,7 @@ from jitter_response import load, lum
 
 d = sys.argv[1]
 region = sys.argv[2] if len(sys.argv) > 2 else "ur"
+include_objects = len(sys.argv) > 3 and sys.argv[3] == "all"      # also measure the pixels the object motion pass covers (plants now are among them)
 fr = []
 for i in range(16):
     mp = os.path.join(d, "f%d_meta.json" % i)
@@ -39,7 +41,7 @@ for k in range(1, len(fr)):
     mv = np.nan_to_num(cur["mv"])
     js = np.array(cur["meta"]["jitterPx"]) - np.array(prev["meta"]["jitterPx"])
     char = cur["obj"][..., 3] > 0.5 if cur["obj"] is not None else np.zeros((h, w), bool)
-    away = ~ndi.binary_dilation(char, iterations=8)
+    away = np.ones((h, w), bool) if include_objects else ~ndi.binary_dilation(char, iterations=8)
     gx = ndi.sobel(lc, axis=1) / 8.0
     gy = ndi.sobel(lc, axis=0) / 8.0
     grad = np.hypot(gx, gy)

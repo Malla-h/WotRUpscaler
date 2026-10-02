@@ -125,6 +125,7 @@ namespace WotRUpscaler
             };
             var fs = new FilteringSettings(RenderQueueRange.all, -1) { excludeMotionVectorObjects = false };
             ctx.DrawRenderers(rd.CullResults, ref ds, ref fs);
+            GrassMv.Draw(ctx, mat);
             if (!logged) { logged = true; Main.Log("character motion vector draw issued"); }
         }
     }
