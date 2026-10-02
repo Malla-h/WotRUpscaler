@@ -14,6 +14,7 @@
     <Reference Include="$(Managed)\Unity.RenderPipelines.Core.Runtime.dll"><Private>false</Private></Reference>
     <Reference Include="$(Managed)\Owlcat.Runtime.Visual.dll"><Private>false</Private></Reference>
     <Reference Include="$(Managed)\Owlcat.Runtime.Core.dll"><Private>false</Private></Reference>
+    <Reference Include="$(Managed)\Unity.Mathematics.dll"><Private>false</Private></Reference>
     <Reference Include="$(Managed)\UnityModManager\UnityModManager.dll"><Private>false</Private></Reference>
     <Reference Include="$(Managed)\0Harmony.dll"><Private>false</Private></Reference>
     <Reference Include="$(Managed)\Assembly-CSharp.dll"><Private>false</Private></Reference>

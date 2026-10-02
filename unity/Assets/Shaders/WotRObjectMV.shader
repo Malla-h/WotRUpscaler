@@ -212,7 +212,8 @@ Shader "Hidden/WotRUpscaler/ObjectMotionVectors"
                     PbdBone m = _PbdBodyWorldToLocalMatrices[_PbdBodyDescriptorIndex];
                     float3 pc = _PbdParticlesPositionBuffer[pi];
                     float3 pp = _WotRPbdPrevParticlesValid > 0.5 ? _WotRPbdPrevParticles[pi] : pc;
-                    PbdBone mp = _WotRPbdPrevMatricesValid > 0.5 ? _WotRPbdPrevBodyMatrices[_PbdBodyDescriptorIndex] : m;
+                    PbdBone mp = m;
+                    if (_WotRPbdPrevMatricesValid > 0.5) mp = _WotRPbdPrevBodyMatrices[_PbdBodyDescriptorIndex];
                     curPos = Affine(m.c0, m.c1, m.c2, m.c3, pc);
                     prevPos = Affine(mp.c0, mp.c1, mp.c2, mp.c3, pp);
                 }
