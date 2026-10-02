@@ -81,15 +81,21 @@ namespace WotRUpscaler
 
         public static string Describe()
         {
+            if (Main.S == null || !Main.S.debug) return Status();
             string detail = "DLSS " + state + (loaded ? " status=" + WotRUpscaler_GetStatus() + " evals=" + WotRUpscaler_GetEvalCount() : "") + (LastFailure.Length > 0 ? " [" + LastFailure + "]" : "");
-            if (Main.S != null && Main.S.debug) return detail;
+            return detail;
+        }
+
+        // What the player should read about DLSS: running, starting, or why it cannot run.
+        public static string Status()
+        {
             switch (state)
             {
                 case St.Ready: return "DLSS is running.";
                 case St.Failed:
-                    return "DLSS cannot run (" + (LastFailure.Length > 0 ? LastFailure : "unknown reason") + "). The game renders normally for now. DLSS needs an NVIDIA RTX graphics card and "
-                        + "nvngx_dlss.dll in the mod folder. Fix the cause and press Retry DLSS.";
-                default: return "DLSS is starting.";
+                    return "DLSS is NOT available: " + (LastFailure.Length > 0 ? LastFailure : "unknown reason") + ". While DLSS is selected the game renders normally. "
+                        + "DLSS needs an NVIDIA RTX graphics card and nvngx_dlss.dll in the mod folder. Fix that, then press Retry DLSS in the Mod Manager panel (Ctrl+F10).";
+                default: return Main.S != null && Main.S.dlss ? "DLSS is starting (it starts once a scene with the 3D view is shown)." : "DLSS is not in use (Simple scaling is selected).";
             }
         }
 

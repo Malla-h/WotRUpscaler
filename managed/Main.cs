@@ -75,6 +75,14 @@ namespace WotRUpscaler
 
         static void OnGUI(UnityModManager.ModEntry e)
         {
+            if (Dlss.Failed)
+            {
+                var old = GUI.contentColor;
+                GUI.contentColor = new Color(1f, 0.45f, 0.3f);
+                GUILayout.Label(Dlss.Status());
+                GUI.contentColor = old;
+                if (GUILayout.Button("Retry DLSS", GUILayout.Width(120))) Dlss.Retry();
+            }
             S.enabled = GUILayout.Toggle(S.enabled, "Scale 3D rendering");
             int ow = Screen.width, oh = Screen.height;
             int rw = Mathf.Max(1, (int)(ow * S.renderScale)), rh = Mathf.Max(1, (int)(oh * S.renderScale));

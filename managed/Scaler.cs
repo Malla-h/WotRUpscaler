@@ -11,7 +11,9 @@ namespace WotRUpscaler
         public static bool Active;
         public static float Scale = 1f;
         public static bool PostDlss;        // true from the moment DLSS has produced the full-resolution colour buffer until the camera is done
-        public static int MainFrame = -1;   // frame in which a scaled camera last finished post-processing
+        public static int MainFrame = -1;
+        static bool loggedActive, loggedUnavailable;
+        static float loggedScale;   // frame in which a scaled camera last finished post-processing
 
         public static bool IsUiCamera(Camera c) { return c.name.StartsWith("UICamera"); }
 
@@ -31,6 +33,12 @@ namespace WotRUpscaler
             bool dlssUnavailable = Main.S.dlss && Dlss.Failed;
             Active = Main.S.enabled && !dlssUnavailable && (Main.S.renderScale < 0.999f || Main.S.dlss);   // scale 1 with DLSS on is DLAA
             Scale = Active ? Mathf.Clamp(Main.S.renderScale, 0.33f, 1f) : 1f;
+            if (Active != loggedActive || dlssUnavailable != loggedUnavailable || (Active && Mathf.Abs(Scale - loggedScale) > 0.001f))
+            {
+                loggedActive = Active; loggedUnavailable = dlssUnavailable; loggedScale = Scale;
+                Main.Log("scaling " + (Active ? "on at " + Scale.ToString("F3") + "x" : "off") + ", upscaler " + (Main.S.dlss ? "DLSS" : "Simple scaling")
+                    + (dlssUnavailable ? " (DLSS cannot run: " + Dlss.LastFailure + ")" : ""));
+            }
             // The pipeline truncates width * scale (3840 * 0.3333 = 1279); a tiny nudge makes exact fractions land on whole pixels.
             float s = Scale < 0.999f ? Scale + 0.0002f : Scale;
             if (Mathf.Abs(asset.RenderScale - s) > 1e-5f) asset.RenderScale = s;

@@ -20,15 +20,24 @@ namespace WotRUpscaler
         static bool tried, registered, synced, inSync, failedLogged;
         static int lastTry = -1000;
         static readonly Dictionary<string, object> shown = new Dictionary<string, object>();
-        static readonly List<KeyValuePair<string, string>> strings = new List<KeyValuePair<string, string>>();
+        static readonly Dictionary<string, string> strings = new Dictionary<string, string>();
+        static string lastTitle = "", lastDescription = "";
+        const string Description = "Renders the 3D scene at a lower resolution and upscales it with NVIDIA DLSS. The interface stays at full resolution.";
         const int KeyCount = 8;
 
         static LocalizedString Str(string key, string text)
         {
             var s = new LocalizedString { Key = key };
-            strings.Add(new KeyValuePair<string, string>(key, text));
+            strings[key] = text;
             if (LocalizationManager.Initialized) LocalizationManager.CurrentPack.PutString(key, text);
             return s;
+        }
+
+        // Replaces the text of a string that was created with Str (the menu reads it when its page opens).
+        static void SetString(string key, string text)
+        {
+            strings[key] = text;
+            if (LocalizationManager.Initialized) LocalizationManager.CurrentPack.PutString(key, text);
         }
 
         internal static void ReRegisterStrings()
@@ -59,7 +68,17 @@ namespace WotRUpscaler
             if (!registered || f - lastTry < 20) return;
             lastTry = f;
             if (Bench.Running) return;                       // the benchmark changes settings temporarily
+            RefreshStatus();
             Sync();
+        }
+
+        // The page title and the mod description say whether DLSS is running or why it is not.
+        static void RefreshStatus()
+        {
+            string title = Dlss.Failed ? "Upscaling: DLSS NOT AVAILABLE" : "Upscaling";
+            string description = Description + " " + Dlss.Status();
+            if (title != lastTitle) { lastTitle = title; SetString("wotrupscaler.title", title); }
+            if (description != lastDescription) { lastDescription = description; SetString("wotrupscaler.description", description); }
         }
 
         [MethodImpl(MethodImplOptions.NoInlining)]
@@ -69,7 +88,7 @@ namespace WotRUpscaler
             var b = SettingsBuilder.New("wotrupscaler", Str("wotrupscaler.title", "Upscaling"))
                 .SetMod(Main.Mod, false, false)
                 .SetModName(Str("wotrupscaler.name", "WotR Upscaler"))
-                .SetModDescription(Str("wotrupscaler.description", "Renders the 3D scene at a lower resolution and upscales it with NVIDIA DLSS. The interface stays at full resolution."))
+                .SetModDescription(Str("wotrupscaler.description", Description + " " + Dlss.Status()))
                 .SetModVersion(info.Version)
                 .SetModAuthor(info.Author);
 

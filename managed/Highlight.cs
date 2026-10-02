@@ -25,7 +25,8 @@ namespace WotRUpscaler
             renderingData.CameraData.CameraTargetDescriptor = d;
 
             var cb = new CommandBuffer { name = "WotRUpscaler outline projection" };
-            cb.SetViewProjectionMatrices(cam.worldToCameraMatrix, Jitter.BaseProjection);
+            // (Without DLSS there is no jitter: the camera's own projection is already the un-jittered one.)
+            cb.SetViewProjectionMatrices(cam.worldToCameraMatrix, Jitter.Applied ? Jitter.BaseProjection : cam.projectionMatrix);
             context.ExecuteCommandBuffer(cb);
             cb.Release();
         }
