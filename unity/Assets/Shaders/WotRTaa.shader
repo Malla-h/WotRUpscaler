@@ -209,6 +209,33 @@ Shader "Hidden/WotRUpscaler/Taa"
             float4 frag(v2f i) : SV_Target { return _WotRTaaColor.SampleLevel(sampler_linear_clamp, i.pos.xy / _WotRTaaDstSize.xy, 0); }
             ENDHLSL
         }
+        // Pass 3: the outline smoothing. _WotRTaaColor holds the image after the game's SMAA; it is blended onto the camera colour only where the
+        // game's outline layer (_HighlightRT, the ring around the highlighted units) has pixels, widened by two pixels so that the edge next to the
+        // outline is included. Everything else keeps the colour that is already there.
+        Pass
+        {
+            Name "OutlineBlend"
+            Blend SrcAlpha OneMinusSrcAlpha
+            HLSLPROGRAM
+            #pragma target 4.5
+            #pragma vertex vert
+            #pragma fragment frag
+            Texture2D<float4> _HighlightRT;
+            float4 frag(v2f i) : SV_Target
+            {
+                int2 p = int2(i.pos.xy);
+                float a = 0.0;
+                // The outline layer may be larger than the output (supersampled): sample it by position, not by pixel.
+                [unroll] for (int y = -2; y <= 2; y++)
+                [unroll] for (int x = -2; x <= 2; x++)
+                {
+                    float4 h = _HighlightRT.SampleLevel(sampler_linear_clamp, (float2(p) + 0.5 + float2(x, y)) / _WotRTaaDstSize.xy, 0);
+                    a = max(a, max(max(h.r, h.g), max(h.b, h.a)));
+                }
+                return float4(_WotRTaaColor.Load(int3(p, 0)).rgb, saturate(a * 4.0));
+            }
+            ENDHLSL
+        }
     }
     Fallback Off
 }

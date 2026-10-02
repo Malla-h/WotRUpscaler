@@ -39,6 +39,8 @@ stay in step. Nothing is bound to a hotkey by this mod.
 - **Upscale before post-processing (HDR input)**: gives the upscaler the unprocessed scene, so bloom, depth of field and colour grading work at full resolution.
   Costs a little performance. Off runs it on the finished image.
 - **Switch off the game's SMAA and FXAA while an upscaler is on**: DLSS and TAA do their own anti-aliasing, and the game's would only soften what they receive.
+- **Smooth outlines**: the hover and selection outlines are drawn by the game after its own anti-aliasing, so they stay jagged. This anti-aliases them with the game's own
+  SMAA, only around the highlighted units and only where the outline is, and only while something is highlighted. The rest of the image is untouched.
 - **Character preview size** (the characters shown in the inventory, the character sheet and character creation): Original (the game's small texture, anti-aliased by the
   upscaler), Follow the upscaler (the default: the quality mode applies to the previews as to the 3D scene) or Size on screen (as many pixels as the preview covers;
   the sharpest and the heaviest). The previews always use the Automatic DLSS preset.

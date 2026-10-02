@@ -470,6 +470,7 @@ namespace WotRUpscaler
                 return;
             }
             if (!Scaler.IsScaled(cam) || !Upscalers.Temporal(Main.S) || !Main.S.dlssBeforePost || (bool)isFinal.GetValue(__instance)) return;
+            Highlight.Remember(__instance);
             Upscale.BeforePost(context, ref renderingData, __instance, descriptor);
         }
 
@@ -482,6 +483,7 @@ namespace WotRUpscaler
                 return;
             }
             if (!Scaler.IsScaled(cam) || (bool)isFinal.GetValue(__instance)) return;
+            Highlight.Remember(__instance);
             if (Scaler.PostDlss) return;            // the HDR path already produced the full-resolution image
             Upscale.AfterPost(context, ref renderingData);
         }

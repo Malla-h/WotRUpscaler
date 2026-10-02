@@ -23,7 +23,7 @@ namespace WotRUpscaler
         static readonly Dictionary<string, string> strings = new Dictionary<string, string>();
         static string lastTitle = "", lastDescription = "";
         const string Description = "Renders the 3D scene at a lower resolution and upscales it with NVIDIA DLSS. The interface stays at full resolution.";
-        const int KeyCount = 9;
+        const int KeyCount = 10;
 
         static LocalizedString Str(string key, string text)
         {
@@ -151,6 +151,9 @@ namespace WotRUpscaler
             b.AddDropdownList(DropdownList.New("wotrupscaler.preview", 1, Str("wotrupscaler.preview", "Character preview size"), previews)
                 .WithLongDescription(Str("wotrupscaler.preview.long", previewTip.ToString()))
                 .OnValueChanged(v => Changed("preview", v)));
+            b.AddToggle(Toggle.New("wotrupscaler.outlines", true, Str("wotrupscaler.outlines", "Smooth outlines"))
+                .WithLongDescription(Str("wotrupscaler.outlines.long", "Anti-aliases the hover and selection outlines with the game's own SMAA, because the game draws them after its anti-aliasing. Only the outline and its surroundings are processed, and only while something is highlighted."))
+                .OnValueChanged(v => Changed("outlines", v)));
             b.AddToggle(Toggle.New("wotrupscaler.mip", true, Str("wotrupscaler.mip", "Automatic mip map bias"))
                 .WithLongDescription(Str("wotrupscaler.mip.long", "Adjusts the texture mip map bias to the render scale, as upscalers expect, so textures stay sharp at lower render resolutions."))
                 .OnValueChanged(v => Changed("mip", v)));
@@ -193,6 +196,7 @@ namespace WotRUpscaler
                 case "smaa": s.disableGameAA = (bool)v; break;
                 case "mip": s.mipAuto = (bool)v; break;
                 case "preview": s.previewSize = (int)v; break;
+                case "outlines": s.smoothOutlines = (bool)v; break;
             }
             Scaler.Update();
             try { s.Save(Main.Mod); } catch { }
@@ -218,6 +222,7 @@ namespace WotRUpscaler
                 PushBool("hdr", s.dlssBeforePost);
                 PushBool("smaa", s.disableGameAA);
                 PushBool("mip", s.mipAuto);
+                PushBool("outlines", s.smoothOutlines);
                 PushInt("preview", Mathf.Clamp(s.previewSize, 0, Presets.PreviewSizes.Length - 1));
                 synced = shown.Count >= KeyCount;
             }

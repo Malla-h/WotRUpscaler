@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.9.2
+- New option **Smooth outlines** (on by default): the hover and selection outlines, which the game draws after its own anti-aliasing and so stay jagged, are anti-aliased
+  with the game's own SMAA. Only the area around the highlighted units is processed and only where the outline is, and only while something is highlighted: the rest
+  of the image is untouched. In the Ctrl+F10 Advanced options and on the ModMenu page.
+
 ## 0.9.1
 - The character previews (inventory, character sheet, character creation) are now upscaled and anti-aliased too, with the selected upscaler (DLSS or TAA),
   each with its own jitter, motion vectors (characters and what they carry) and history. Before, they only had the game's SMAA.
