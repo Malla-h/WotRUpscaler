@@ -43,6 +43,7 @@ Shader "Hidden/WotRUpscaler/ObjectMotionVectors"
     {
         float3 vertex : POSITION;
         float3 oldPos : TEXCOORD4;
+        uint vertexId : SV_VertexID;
         float4 blendWeights : BLENDWEIGHTS;     // position based dynamics skinning (trees, bushes, tents), see PbdSkin
         uint4 blendIndices : BLENDINDICES;
     };
@@ -91,6 +92,18 @@ Shader "Hidden/WotRUpscaler/ObjectMotionVectors"
             pos = vtx + k * k * (q1 - p1);
         }
         return pos;
+    }
+
+    // Cloth (cloaks, flags): the vertex positions come straight from the simulation's particle buffer (world space), one particle per mesh
+    // vertex starting at _PbdParticlesOffset, converted to object space by a per-body matrix. Last frame's positions come from the copy the
+    // mod keeps of that buffer (also used for the grass).
+    StructuredBuffer<PbdBone> _PbdBodyWorldToLocalMatrices;
+    int _PbdParticlesOffset, _PbdBodyDescriptorIndex;
+
+    // Cloth bodies set no bone weight mask (skinned bodies do).
+    bool PbdCloth()
+    {
+        return _PbdEnabledLocal > 0.5 && _PbdEnabledGlobal > 0.5 && dot(_PbdWeightMask, float4(1.0, 1.0, 1.0, 1.0)) < 0.5;
     }
 
     // Set by the game per renderer (property block) for skinned bodies: not for the physics cloth or grass modes (no weight mask there).
@@ -184,20 +197,32 @@ Shader "Hidden/WotRUpscaler/ObjectMotionVectors"
             {
                 v2f o;
                 bool pbd = PbdSkinned();
+                bool cloth = !pbd && PbdCloth();
                 float3 curPos = v.vertex, prevPos = v.vertex;
                 if (pbd)
                 {
                     curPos = PbdSkinCurrent(v);
                     prevPos = _WotRPbdPrevValid > 0.5 ? PbdSkinPrevious(v) : curPos;
                 }
+                if (cloth)
+                {
+                    uint pi = v.vertexId + _PbdParticlesOffset;
+                    PbdBone m = _PbdBodyWorldToLocalMatrices[_PbdBodyDescriptorIndex];
+                    float3 pc = _PbdParticlesPositionBuffer[pi];
+                    float3 pp = _WotRPbdPrevParticlesValid > 0.5 ? _WotRPbdPrevParticles[pi] : pc;
+                    curPos = Affine(m.c0, m.c1, m.c2, m.c3, pc);
+                    prevPos = Affine(m.c0, m.c1, m.c2, m.c3, pp);
+                }
                 float4 wp = mul(unity_ObjectToWorld, float4(curPos, 1.0));
                 o.pos = mul(_WotRJitteredVP, wp);
                 o.cur = mul(_WotRNonJitteredVP, wp);
                 bool skinned;
-                bool draw = IsCharacterPart(skinned) || pbd;
-                float3 old = pbd ? prevPos : (skinned ? v.oldPos : v.vertex);
+                bool draw = IsCharacterPart(skinned) || pbd || cloth;
+                float3 old = (pbd || cloth) ? prevPos : (skinned ? v.oldPos : v.vertex);
                 // A skinned mesh with an untrustworthy previous transform keeps its skinning motion (old vertex position) only.
-                float4x4 pmat = PrevMatrixSane() ? unity_MatrixPreviousM : unity_ObjectToWorld;
+                // (Cloth: the particle positions are in world space already, converted to object space by this frame's matrix, so the
+                // previous position goes back through this frame's object matrix too.)
+                float4x4 pmat = (PrevMatrixSane() && !cloth) ? unity_MatrixPreviousM : unity_ObjectToWorld;
                 o.prev = mul(_WotRPreviousVP, mul(pmat, float4(old, 1.0)));
                 if (_WotRDebug < 0.5 && !draw)
                     o.pos = float4(2.0, 2.0, 2.0, 1.0);
