@@ -23,7 +23,7 @@ Pop-Location
 $dll = Join-Path $root "managed\bin\Release\net48\WotRUpscaler.dll"
 if (-not (Test-Path $dll)) { throw "WotRUpscaler.dll was not built." }
 # The release must contain the in-game menu page (it is built in only when ModMenu is installed next to the game).
-if (-not (Select-String -Path $dll -Pattern "wotrupscaler.preset.other" -Encoding Unicode -Quiet)) { throw "The build has no ModMenu page. Install ModMenu in the game's Mods folder before packaging." }
+if (-not [Text.Encoding]::Latin1.GetString([IO.File]::ReadAllBytes($dll)).Contains(([string[]][char[]]"wotrupscaler.preset.other" -join "`0") + "`0")) { throw "The build has no ModMenu page. Install ModMenu in the game's Mods folder before packaging." }
 
 # 2. Native plugin and shader bundle must exist and be newer than their sources.
 $native = Join-Path $root "native\bin\WotRUpscalerNative.dll"
