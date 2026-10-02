@@ -10,12 +10,24 @@ namespace WotRUpscaler
     // matrices, which are next frame's "previous").
     public static class PbdMotion
     {
-        static ComputeBuffer prev, dummy, prevParticles;
-        static int snapFrame = -10, particlesFrame = -10;
+        static ComputeBuffer prev, dummy, prevParticles, prevMatrices;
+        static int snapFrame = -10, particlesFrame = -10, matricesFrame = -10;
         public static ComputeBuffer PrevParticles { get { return prevParticles; } }
         static bool logged;
         static readonly int PrevId = Shader.PropertyToID("_WotRPbdPrevBindposes"), ValidId = Shader.PropertyToID("_WotRPbdPrevValid"),
-            PrevParticlesId = Shader.PropertyToID("_WotRPbdPrevParticles"), PrevParticlesValidId = Shader.PropertyToID("_WotRPbdPrevParticlesValid");
+            PrevParticlesId = Shader.PropertyToID("_WotRPbdPrevParticles"), PrevParticlesValidId = Shader.PropertyToID("_WotRPbdPrevParticlesValid"),
+            PrevMatricesId = Shader.PropertyToID("_WotRPbdPrevBodyMatrices"), PrevMatricesValidId = Shader.PropertyToID("_WotRPbdPrevMatricesValid");
+
+        static ComputeBuffer CurrentMatrices()
+        {
+            try
+            {
+                var g = PBD.GetGPUData();
+                var b = g != null && g.BodyWorldToLocalMatricesSoA != null ? g.BodyWorldToLocalMatricesSoA.Buffer : null;
+                return b != null && b.IsValid() ? b : null;
+            }
+            catch { return null; }
+        }
 
         static ComputeBuffer CurrentParticles()
         {
@@ -50,11 +62,16 @@ namespace WotRUpscaler
             bool okP = curP != null && prevParticles != null && prevParticles.IsValid() && prevParticles.count == curP.count && Time.frameCount - particlesFrame == 1;
             cb.SetGlobalFloat(PrevParticlesValidId, okP ? 1f : 0f);
             cb.SetGlobalBuffer(PrevParticlesId, okP ? prevParticles : dummy);
+            var curM = CurrentMatrices();
+            bool okM = curM != null && prevMatrices != null && prevMatrices.IsValid() && prevMatrices.count == curM.count && Time.frameCount - matricesFrame == 1;
+            cb.SetGlobalFloat(PrevMatricesValidId, okM ? 1f : 0f);
+            cb.SetGlobalBuffer(PrevMatricesId, okM ? prevMatrices : dummy);
         }
 
         public static void Snapshot(CommandBuffer cb)
         {
             SnapshotParticles(cb);
+            SnapshotMatrices(cb);
             var cur = Current();
             if (cur == null) return;
             if (prev == null || !prev.IsValid() || prev.count != cur.count)
@@ -66,6 +83,20 @@ namespace WotRUpscaler
             }
             Dlss.QueueCopyBuffer(cb, prev.GetNativeBufferPtr(), cur.GetNativeBufferPtr());
             snapFrame = Time.frameCount;
+        }
+
+        // The per-body world to local matrices (cloth converts its particles with them).
+        static void SnapshotMatrices(CommandBuffer cb)
+        {
+            var cur = CurrentMatrices();
+            if (cur == null) return;
+            if (prevMatrices == null || !prevMatrices.IsValid() || prevMatrices.count != cur.count)
+            {
+                if (prevMatrices != null) prevMatrices.Release();
+                prevMatrices = new ComputeBuffer(cur.count, cur.stride);
+            }
+            Dlss.QueueCopyBuffer(cb, prevMatrices.GetNativeBufferPtr(), cur.GetNativeBufferPtr());
+            matricesFrame = Time.frameCount;
         }
 
         // The simulated particle positions (grass blades are driven by them).

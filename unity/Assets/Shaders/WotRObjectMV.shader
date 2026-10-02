@@ -98,6 +98,8 @@ Shader "Hidden/WotRUpscaler/ObjectMotionVectors"
     // vertex starting at _PbdParticlesOffset, converted to object space by a per-body matrix. Last frame's positions come from the copy the
     // mod keeps of that buffer (also used for the grass).
     StructuredBuffer<PbdBone> _PbdBodyWorldToLocalMatrices;
+    StructuredBuffer<PbdBone> _WotRPbdPrevBodyMatrices;
+    float _WotRPbdPrevMatricesValid;
     int _PbdParticlesOffset, _PbdBodyDescriptorIndex;
 
     // Cloth bodies set no bone weight mask (skinned bodies do).
@@ -210,8 +212,9 @@ Shader "Hidden/WotRUpscaler/ObjectMotionVectors"
                     PbdBone m = _PbdBodyWorldToLocalMatrices[_PbdBodyDescriptorIndex];
                     float3 pc = _PbdParticlesPositionBuffer[pi];
                     float3 pp = _WotRPbdPrevParticlesValid > 0.5 ? _WotRPbdPrevParticles[pi] : pc;
+                    PbdBone mp = _WotRPbdPrevMatricesValid > 0.5 ? _WotRPbdPrevBodyMatrices[_PbdBodyDescriptorIndex] : m;
                     curPos = Affine(m.c0, m.c1, m.c2, m.c3, pc);
-                    prevPos = Affine(m.c0, m.c1, m.c2, m.c3, pp);
+                    prevPos = Affine(mp.c0, mp.c1, mp.c2, mp.c3, pp);
                 }
                 float4 wp = mul(unity_ObjectToWorld, float4(curPos, 1.0));
                 o.pos = mul(_WotRJitteredVP, wp);
@@ -220,9 +223,10 @@ Shader "Hidden/WotRUpscaler/ObjectMotionVectors"
                 bool draw = IsCharacterPart(skinned) || pbd || cloth;
                 float3 old = (pbd || cloth) ? prevPos : (skinned ? v.oldPos : v.vertex);
                 // A skinned mesh with an untrustworthy previous transform keeps its skinning motion (old vertex position) only.
-                // (Cloth: the particle positions are in world space already, converted to object space by this frame's matrix, so the
-                // previous position goes back through this frame's object matrix too.)
-                float4x4 pmat = (PrevMatrixSane() && !cloth) ? unity_MatrixPreviousM : unity_ObjectToWorld;
+                // (Cloth: the particles are in world space and only reach the screen through the body matrix and the object matrix. Between
+                // physics steps they stay put while the character's animation still moves the object matrix, so the previous position needs the
+                // previous object matrix and the previous body matrix.)
+                float4x4 pmat = PrevMatrixSane() ? unity_MatrixPreviousM : unity_ObjectToWorld;
                 o.prev = mul(_WotRPreviousVP, mul(pmat, float4(old, 1.0)));
                 if (_WotRDebug < 0.5 && !draw)
                     o.pos = float4(2.0, 2.0, 2.0, 1.0);
