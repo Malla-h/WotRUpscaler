@@ -81,7 +81,16 @@ namespace WotRUpscaler
 
         public static string Describe()
         {
-            return "DLSS " + state + (loaded ? " status=" + WotRUpscaler_GetStatus() + " evals=" + WotRUpscaler_GetEvalCount() : "") + (LastFailure.Length > 0 ? " [" + LastFailure + "]" : "");
+            string detail = "DLSS " + state + (loaded ? " status=" + WotRUpscaler_GetStatus() + " evals=" + WotRUpscaler_GetEvalCount() : "") + (LastFailure.Length > 0 ? " [" + LastFailure + "]" : "");
+            if (Main.S != null && Main.S.debug) return detail;
+            switch (state)
+            {
+                case St.Ready: return "DLSS is running.";
+                case St.Failed:
+                    return "DLSS cannot run (" + (LastFailure.Length > 0 ? LastFailure : "unknown reason") + "). The game renders normally for now. DLSS needs an NVIDIA RTX graphics card and "
+                        + "nvngx_dlss.dll in the mod folder. Fix the cause and press Retry DLSS.";
+                default: return "DLSS is starting.";
+            }
         }
 
         public static void Retry() { if (state == St.Failed) { state = St.Off; LastFailure = ""; } }

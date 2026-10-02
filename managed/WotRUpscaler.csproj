@@ -1,9 +1,16 @@
 <Project Sdk="Microsoft.NET.Sdk">
+  <!-- Machine-specific settings go in local.props (git-ignored), e.g.:
+       <Project><PropertyGroup><WotRDir>D:\Games\Pathfinder Second Adventure</WotRDir></PropertyGroup></Project>
+       Alternatively set the WOTR_DIR environment variable, or pass -p:WotRDir=... on the command line. -->
+  <Import Project="local.props" Condition="Exists('local.props')" />
   <PropertyGroup>
     <TargetFramework>net48</TargetFramework>
     <AssemblyName>WotRUpscaler</AssemblyName>
     <LangVersion>latest</LangVersion>
-    <WotRDir Condition="'$(WotRDir)'==''">H:\SteamLibrary\steamapps\common\Pathfinder Second Adventure</WotRDir>
+    <!-- Release builds must not embed the build machine's folder path (the debug-symbol path would put the user name in the DLL). -->
+    <DebugType Condition="'$(Configuration)' == 'Release'">none</DebugType>
+    <WotRDir Condition="'$(WotRDir)' == '' And '$(WOTR_DIR)' != ''">$(WOTR_DIR)</WotRDir>
+    <WotRDir Condition="'$(WotRDir)' == ''">C:\Program Files (x86)\Steam\steamapps\common\Pathfinder Second Adventure</WotRDir>
     <Managed>$(WotRDir)\Wrath_Data\Managed</Managed>
   </PropertyGroup>
   <ItemGroup>

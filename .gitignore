@@ -33,3 +33,7 @@ Settings.xml
 __pycache__/
 *.pyc
 .vs/
+
+local.props
+dist/
+release-forbidden.txt
